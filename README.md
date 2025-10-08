@@ -176,3 +176,4 @@ python manage.py test
 
 ---
 *ConnectBot v21 - Connecting colleagues, one activity at a time! 🎉*
+
