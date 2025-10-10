@@ -1,0 +1,29 @@
+{
+  "timestamp": "2025-10-09 22:19:46",
+  "status_check": {
+    "timestamp": "2025-10-09 22:19:46",
+    "search_by_id": {
+      "found": true,
+      "full_name": "Зорин Алексей",
+      "position": "Админ",
+      "telegram_id": 1315776671,
+      "telegram_username": "Alexis_yes",
+      "is_active": true,
+      "authorized": true
+    },
+    "search_by_username": {
+      "found": true,
+      "full_name": "Зорин Алексей",
+      "position": "Админ",
+      "telegram_id": 1315776671,
+      "telegram_username": "Alexis_yes",
+      "is_active": true,
+      "authorized": true
+    },
+    "all_users_count": 7
+  },
+  "start_command_test": {
+    "success": true,
+    "message": "✅ Добро пожаловать, Зорин Алексей!\\n🏢 Позиция: Админ\\n🏬 Департамент: Техническая поддержка\\n📧 Email: activ546@gmail.com\\n\\n🤖 ConnectBot активирован для пользователя @Alexis_yes\\n🆔 Ваш Telegram ID: 1315776671"
+  }
+}

@@ -15,16 +15,16 @@ class MenuManager:
     async def create_main_menu():
         """Главное меню"""
         keyboard = [
-            [InlineKeyboardButton("👤 Мой профиль", callback_data="menu_profile")],
-            [InlineKeyboardButton("🎯 Мои интересы", callback_data="menu_interests")],
-            [InlineKeyboardButton("📅 Календарь активностей", callback_data="menu_calendar")],
-            [InlineKeyboardButton("🏆 Достижения", callback_data="menu_achievements")],
-            [InlineKeyboardButton("🆘 Помощь", callback_data="menu_help")],
-            [InlineKeyboardButton("⚙️ Настройки", callback_data="menu_settings")],
+            [InlineKeyboardButton("Мой профиль", callback_data="menu_profile")],
+            [InlineKeyboardButton("Мои интересы", callback_data="menu_interests")],
+            [InlineKeyboardButton("Календарь активностей", callback_data="menu_calendar")],
+            [InlineKeyboardButton("Достижения", callback_data="menu_achievements")],
+            [InlineKeyboardButton("Помощь", callback_data="menu_help")],
+            [InlineKeyboardButton("Настройки", callback_data="menu_settings")],
         ]
         
         return {
-            'text': "🤖 *ConnectBot - Главное меню*\n\nВыберите раздел:",
+            'text': "*ConnectBot - Главное меню*\n\nВыберите раздел:",
             'reply_markup': InlineKeyboardMarkup(keyboard),
             'parse_mode': 'Markdown'
         }
@@ -34,35 +34,79 @@ class MenuManager:
         """Меню профиля сотрудника"""
         from employees.utils import PreferenceManager
         
-        # Получаем статистику
-        interests = await PreferenceManager.get_employee_interests(employee)
-        active_interests = [ei for ei in interests if ei.is_active]
-        
-        profile_text = f"""
-👤 *Профиль: {employee.full_name}*
+        try:
+            # Получаем статистику
+            interests = await PreferenceManager.get_employee_interests(employee)
+            active_interests = [ei for ei in interests if ei.is_active]
+            
+            # Безопасно получаем данные отдела
+            department_name = 'Не указан'
+            try:
+                if employee.department:
+                    department_name = employee.department.name
+            except:
+                department_name = 'Не указан'
+            
+            # Безопасно получаем данные бизнес-центра
+            bc_name = 'Не указан'
+            try:
+                if employee.business_center:
+                    bc_name = employee.business_center.name
+            except:
+                bc_name = 'Не указан'
+            
+            # Безопасно получаем дату создания
+            created_date = 'Не указана'
+            try:
+                if employee.created_at:
+                    created_date = employee.created_at.strftime('%d.%m.%Y')
+            except:
+                created_date = 'Не указана'
+            
+            profile_text = f"""
+*Профиль: {employee.full_name}*
 
 *Основная информация:*
 • Должность: {employee.position or 'Не указана'}
-• Отдел: {employee.department.name if employee.department else 'Не указан'}
-• БЦ: {employee.business_center.name if employee.business_center else 'Не указан'}
+• Отдел: {department_name}
+• БЦ: {bc_name}
 
 *Статистика:*
-• 🎯 Активных интересов: {len(active_interests)}
-• 📅 В системе с: {employee.created_at.strftime('%d.%m.%Y')}
-• 🔐 Авторизован: {'✅ Да' if employee.authorized else '❌ Нет'}
+• Активных интересов: {len(active_interests)}
+• В системе с: {created_date}
+• Авторизован: {'Да' if employee.authorized else 'Нет'}
 """
-        keyboard = [
-            [InlineKeyboardButton("📊 Подробная статистика", callback_data="profile_stats")],
-            [InlineKeyboardButton("🎭 Мои достижения", callback_data="profile_achievements")],
-            [InlineKeyboardButton("📈 Активность по месяцам", callback_data="profile_activity")],
-            [InlineKeyboardButton("↩️ Назад в меню", callback_data="back_main")],
-        ]
-        
-        return {
-            'text': profile_text,
-            'reply_markup': InlineKeyboardMarkup(keyboard),
-            'parse_mode': 'Markdown'
-        }
+            keyboard = [
+                [InlineKeyboardButton("Подробная статистика", callback_data="profile_stats")],
+                [InlineKeyboardButton("Мои достижения", callback_data="profile_achievements")],
+                [InlineKeyboardButton("Активность по месяцам", callback_data="profile_activity")],
+                [InlineKeyboardButton("Назад в меню", callback_data="back_main")],
+            ]
+            
+            return {
+                'text': profile_text,
+                'reply_markup': InlineKeyboardMarkup(keyboard),
+                'parse_mode': 'Markdown'
+            }
+            
+        except Exception as e:
+            logger.error(f"Ошибка создания меню профиля: {e}")
+            # Возвращаем упрощенное меню при ошибке
+            simple_text = f"""
+*Профиль: {getattr(employee, 'full_name', 'Неизвестно')}*
+
+Извините, произошла ошибка при загрузке данных профиля.
+Попробуйте позже или обратитесь к администратору.
+"""
+            keyboard = [
+                [InlineKeyboardButton("Назад в меню", callback_data="back_main")],
+            ]
+            
+            return {
+                'text': simple_text,
+                'reply_markup': InlineKeyboardMarkup(keyboard),
+                'parse_mode': 'Markdown'
+            }
     
     @staticmethod
     async def create_interests_menu(employee):

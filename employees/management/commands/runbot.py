@@ -1,8 +1,10 @@
 """
 Основной модуль Telegram бота ConnectBot
+Версия с исправлениями конфликтов getUpdates
 """
 import asyncio
 import logging
+import signal
 from django.core.management.base import BaseCommand
 from django.conf import settings
 from telegram import Update
@@ -10,6 +12,7 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 from asgiref.sync import sync_to_async
 
 from employees.utils import AuthManager, PreferenceManager
+from employees.redis_utils import RedisManager
 from bots.menu_manager import MenuManager
 
 logger = logging.getLogger(__name__)
@@ -19,6 +22,59 @@ class ConnectBot:
     def __init__(self):
         self.token = settings.TELEGRAM_BOT_TOKEN
         self.application = None
+        self.redis_available = RedisManager.is_redis_available()
+        self.running = False
+        
+        # Добавляем обработку сигналов для корректного завершения
+        signal.signal(signal.SIGINT, self._signal_handler)
+        signal.signal(signal.SIGTERM, self._signal_handler)
+        
+        if self.redis_available:
+            logger.info("Redis доступен, включено кеширование сессий")
+        else:
+            logger.warning("Redis недоступен, кеширование сессий отключено")
+    
+    def _signal_handler(self, signum, frame):
+        """Обработчик сигналов для корректного завершения"""
+        logger.info(f"Получен сигнал {signum}, останавливаем бот...")
+        self.running = False
+        
+        if self.application and self.application.updater:
+            asyncio.create_task(self.shutdown())
+    
+    async def shutdown(self):
+        """Корректное завершение работы бота"""
+        try:
+            if self.application:
+                await self.application.stop()
+                await self.application.shutdown()
+            logger.info("Бот корректно остановлен")
+        except Exception as e:
+            logger.error(f"Ошибка при завершении: {e}")
+    
+    async def get_user_session(self, user_id: int) -> dict:
+        """Получить сессию пользователя"""
+        if not self.redis_available:
+            return {}
+        
+        session_data = RedisManager.get_bot_session(user_id)
+        return session_data or {}
+    
+    async def update_user_session(self, user_id: int, session_data: dict):
+        """Обновить сессию пользователя"""
+        if not self.redis_available:
+            return
+        
+        current_session = await self.get_user_session(user_id)
+        current_session.update(session_data)
+        RedisManager.store_bot_session(user_id, current_session)
+    
+    async def clear_user_session(self, user_id: int):
+        """Очистить сессию пользователя"""
+        if not self.redis_available:
+            return
+        
+        RedisManager.clear_bot_session(user_id)
         
     async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /start"""
@@ -29,19 +85,29 @@ class ConnectBot:
             employee, is_new = await AuthManager.authorize_employee(user)
             
             if employee:
+                # Инициализируем/обновляем сессию пользователя
+                await self.update_user_session(user.id, {
+                    'employee_id': employee.id,
+                    'employee_name': employee.full_name,
+                    'authorized': True,
+                    'last_command': '/start'
+                })
+                
                 # Отправляем приветственное сообщение
                 welcome_message = await AuthManager.get_welcome_message(employee)
                 await update.message.reply_text(welcome_message, parse_mode='Markdown')
                 
                 # Если новая авторизация, предлагаем настроить предпочтения
                 if is_new:
+                    await self.update_user_session(user.id, {'setup_step': 'preferences'})
                     await self.show_preferences_setup(update, context, employee)
                 else:
                     # Показываем главное меню
                     await self.show_main_menu(update, context)
                     
             else:
-                # Пользователь не найден
+                # Пользователь не найден - очищаем сессию
+                await self.clear_user_session(user.id)
                 error_message = await AuthManager.get_unauthorized_message()
                 formatted_message = error_message.format(username=user.username or 'ваш_username')
                 await update.message.reply_text(formatted_message, parse_mode='Markdown')
@@ -49,7 +115,7 @@ class ConnectBot:
         except Exception as e:
             logger.error(f"Ошибка в команде /start: {e}")
             await update.message.reply_text(
-                "❌ Произошла ошибка при авторизации. Попробуйте позже или обратитесь к администратору."
+                "Произошла ошибка при авторизации. Попробуйте позже или обратитесь к администратору."
             )
     
     async def show_preferences_setup(self, update: Update, context: ContextTypes.DEFAULT_TYPE, employee):
@@ -131,28 +197,38 @@ class ConnectBot:
             
         except Exception as e:
             logger.error(f"Ошибка в команде /preferences: {e}")
-            await update.message.reply_text("❌ Произошла ошибка. Попробуйте позже.")
+            await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
     
     async def menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /menu"""
         await self.show_main_menu(update, context)
     
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик callback-запросов"""
+        """Обработчик callback-запросов с улучшенной обработкой ошибок"""
         query = update.callback_query
-        await query.answer()
-        
-        callback_data = query.data
-        user = query.from_user
         
         try:
+            await query.answer()
+            callback_data = query.data
+            user = query.from_user
+            
+            # Проверяем сессию пользователя
+            session_data = await self.get_user_session(user.id)
+            
             # Авторизуем сотрудника
             employee, _ = await AuthManager.authorize_employee(user)
             if not employee:
+                await self.clear_user_session(user.id)
                 await query.edit_message_text(
-                    "❌ Ваша сессия устарела. Используйте /start для повторной авторизации."
+                    "Ваша сессия устарела. Используйте /start для повторной авторизации."
                 )
                 return
+            
+            # Обновляем сессию
+            await self.update_user_session(user.id, {
+                'last_callback': callback_data,
+                'last_action_time': str(asyncio.get_event_loop().time())
+            })
             
             # Обрабатываем навигацию по меню
             if callback_data == "menu_profile":
@@ -188,7 +264,7 @@ class ConnectBot:
                 
             elif callback_data == "skip_setup":
                 await query.edit_message_text(
-                    "✅ Отлично! Вы можете настроить интересы позже через команду /preferences\n\n"
+                    "Отлично! Вы можете настроить интересы позже через команду /preferences\n\n"
                     "Переходим в главное меню...",
                     parse_mode='Markdown'
                 )
@@ -217,18 +293,26 @@ class ConnectBot:
                 
             else:
                 await query.edit_message_text(
-                    "🔧 Функция в разработке...\n\n"
-                    "Скоро здесь появится новый функционал! 🚀",
+                    "Функция в разработке...\n\n"
+                    "Скоро здесь появится новый функционал!",
                     parse_mode='Markdown'
                 )
                 
         except Exception as e:
             logger.error(f"Ошибка обработки callback: {e}")
-            await query.edit_message_text("❌ Произошла ошибка. Попробуйте позже.")
+            try:
+                await query.edit_message_text("Произошла ошибка. Попробуйте позже.")
+            except:
+                # Если не удалось отредактировать сообщение, попробуем ответить
+                try:
+                    await query.answer("Произошла ошибка", show_alert=True)
+                except:
+                    pass  # Игнорируем ошибки при уведомлении
     
     async def handle_interest_toggle(self, query, context, employee, callback_data):
         """Обработка переключения интереса"""
         interest_code = callback_data.replace("toggle_interest_", "")
+        user = query.from_user
         
         # Получаем все интересы
         all_interests = await PreferenceManager.get_all_interests()
@@ -245,15 +329,23 @@ class ConnectBot:
         is_currently_active = current_ei.is_active if current_ei else False
         new_status = not is_currently_active
         
-        status_icon = "✅" if new_status else "❌"
+        status_text = "ВКЛ" if new_status else "ВЫКЛ"
         
         await query.answer(
-            f"Будет установлено: {status_icon} {current_interest.emoji} {current_interest.name}\n"
+            f"Будет установлено: {status_text} {current_interest.name}\n"
             f"Не забудьте сохранить изменения!",
             show_alert=False
         )
         
-        # Сохраняем в контексте временное состояние
+        # Сохраняем в Redis сессии и контексте временное состояние
+        session_data = await self.get_user_session(user.id)
+        if 'pending_interests' not in session_data:
+            session_data['pending_interests'] = {}
+        session_data['pending_interests'][interest_code] = new_status
+        
+        await self.update_user_session(user.id, {'pending_interests': session_data['pending_interests']})
+        
+        # Дублируем в контекст для совместимости
         if 'pending_interests' not in context.user_data:
             context.user_data['pending_interests'] = {}
         context.user_data['pending_interests'][interest_code] = new_status
@@ -261,10 +353,17 @@ class ConnectBot:
     async def save_interests(self, query, context, employee):
         """Сохранение изменений интересов"""
         try:
-            pending_interests = context.user_data.get('pending_interests', {})
+            user = query.from_user
+            
+            # Получаем pending_interests из Redis сессии или контекста
+            session_data = await self.get_user_session(user.id)
+            pending_interests = session_data.get('pending_interests', {})
             
             if not pending_interests:
-                await query.answer("❌ Нет изменений для сохранения", show_alert=True)
+                pending_interests = context.user_data.get('pending_interests', {})
+            
+            if not pending_interests:
+                await query.answer("Нет изменений для сохранения", show_alert=True)
                 return
             
             # Применяем изменения
@@ -274,31 +373,36 @@ class ConnectBot:
             )
             
             if success:
-                # Очищаем временные данные
+                # Очищаем временные данные из обеих систем
                 context.user_data['pending_interests'] = {}
-                await query.answer("✅ Изменения сохранены!", show_alert=True)
+                await self.update_user_session(user.id, {'pending_interests': {}})
+                
+                # Инвалидируем кеш интересов сотрудника
+                await RedisManager.async_invalidate_employee_cache(employee.id)
+                
+                await query.answer("Изменения сохранены!", show_alert=True)
                 # Обновляем меню - создаем Update из query
                 fake_update = type('Update', (), {'callback_query': query})()
                 await self.show_interests_menu(fake_update, context, employee)
             else:
-                await query.answer("❌ Ошибка сохранения", show_alert=True)
+                await query.answer("Ошибка сохранения", show_alert=True)
                 
         except Exception as e:
             logger.error(f"Ошибка сохранения интересов: {e}")
-            await query.answer("❌ Ошибка сохранения", show_alert=True)
+            await query.answer("Ошибка сохранения", show_alert=True)
     
     async def show_disable_all_confirmation(self, query, context):
         """Подтверждение отписки от всех интересов"""
         from telegram import InlineKeyboardButton, InlineKeyboardMarkup
         
         keyboard = [
-            [InlineKeyboardButton("✅ Да, отписаться", callback_data="confirm_disable_all")],
-            [InlineKeyboardButton("❌ Отмена", callback_data="cancel_disable_all")],
+            [InlineKeyboardButton("Да, отписаться", callback_data="confirm_disable_all")],
+            [InlineKeyboardButton("Отмена", callback_data="cancel_disable_all")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         
         await query.edit_message_text(
-            "🚫 *Отписка от всех активностей*\n\n"
+            "*Отписка от всех активностей*\n\n"
             "Вы уверены, что хотите отписаться от всех уведомлений?\n\n"
             "После этого вы не будете получать приглашения на мероприятия.",
             reply_markup=reply_markup,
@@ -308,21 +412,27 @@ class ConnectBot:
     async def disable_all_interests(self, query, context, employee):
         """Отписка от всех интересов"""
         try:
+            user = query.from_user
             success = await PreferenceManager.disable_all_interests(employee)
             
             if success:
-                # Очищаем временные данные
+                # Очищаем временные данные из обеих систем
                 context.user_data['pending_interests'] = {}
-                await query.answer("✅ Отписались от всех активностей!", show_alert=True)
+                await self.update_user_session(user.id, {'pending_interests': {}})
+                
+                # Инвалидируем кеш интересов сотрудника
+                await RedisManager.async_invalidate_employee_cache(employee.id)
+                
+                await query.answer("Отписались от всех активностей!", show_alert=True)
                 # Создаем Update из query для обновления меню
                 fake_update = type('Update', (), {'callback_query': query})()
                 await self.show_interests_menu(fake_update, context, employee)
             else:
-                await query.answer("❌ Ошибка отписки", show_alert=True)
+                await query.answer("Ошибка отписки", show_alert=True)
                 
         except Exception as e:
             logger.error(f"Ошибка отписки от всех интересов: {e}")
-            await query.answer("❌ Ошибка отписки", show_alert=True)
+            await query.answer("Ошибка отписки", show_alert=True)
     
     async def show_help_topic(self, query, context, callback_data):
         """Показать конкретную тему помощи"""
@@ -380,7 +490,16 @@ class ConnectBot:
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /help"""
-        await self.show_help_menu(update, context)
+        help_text = (
+            "🤖 *ConnectBot - Помощь*\n\n"
+            "📋 *Доступные команды:*\n"
+            "/start - Авторизация и главное меню\n"
+            "/menu - Главное меню\n"
+            "/preferences - Настройка интересов\n"
+            "/help - Эта справка\n\n"
+            "💡 *Совет:* Используйте кнопки меню для удобной навигации!"
+        )
+        await update.message.reply_text(help_text, parse_mode='Markdown')
     
     def setup_handlers(self):
         """Настройка обработчиков команд"""
@@ -395,6 +514,9 @@ class ConnectBot:
         
         # Обработчик текстовых сообщений
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_message))
+        
+        # Добавляем глобальный обработчик ошибок
+        self.application.add_error_handler(self.error_handler)
     
     async def handle_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик текстовых сообщений"""
@@ -417,17 +539,57 @@ class ConnectBot:
             parse_mode='Markdown'
         )
     
+    async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        """Глобальный обработчик ошибок"""
+        logger.error(f"Необработанная ошибка: {context.error}")
+        
+        if update and update.effective_message:
+            try:
+                await update.effective_message.reply_text(
+                    "Произошла техническая ошибка. Администратор уведомлен."
+                )
+            except:
+                pass  # Игнорируем ошибки при отправке сообщения об ошибке
+    
+
+    
     def run(self):
-        """Запуск бота"""
+        """Запуск бота - синхронный"""
         if not self.token:
             logger.error("TELEGRAM_BOT_TOKEN не установлен")
             return
-        
-        self.application = Application.builder().token(self.token).build()
-        self.setup_handlers()
-        
-        logger.info("Бот запущен и ожидает сообщений...")
-        self.application.run_polling()
+            
+        try:
+            # Создаем приложение с дополнительными настройками
+            self.application = (
+                Application.builder()
+                .token(self.token)
+                .read_timeout(30)      # Увеличиваем таймаут чтения
+                .write_timeout(30)     # Увеличиваем таймаут записи
+                .connect_timeout(20)   # Таймаут подключения
+                .pool_timeout(10)      # Таймаут пула соединений
+                .get_updates_read_timeout(10)  # Таймаут для getUpdates
+                .build()
+            )
+            
+            # Настраиваем обработчики
+            self.setup_handlers()
+            
+            logger.info("ConnectBot запущен и готов к работе!")
+            
+            # Запускаем polling - это блокирующий вызов
+            self.application.run_polling(
+                poll_interval=2.0,      # Интервал между запросами
+                timeout=10,             # Таймаут long polling
+                drop_pending_updates=True  # Сбрасываем старые обновления
+            )
+            
+        except KeyboardInterrupt:
+            logger.info("Получен сигнал остановки от пользователя")
+        except Exception as e:
+            logger.error(f"Критическая ошибка: {e}")
+        finally:
+            logger.info("ConnectBot остановлен")
 
 
 class Command(BaseCommand):
@@ -440,27 +602,4 @@ class Command(BaseCommand):
         self.stdout.write(self.style.SUCCESS('Запуск ConnectBot...'))
         
         bot = ConnectBot()
-        
-        try:
-            bot.run()
-        except KeyboardInterrupt:
-            self.stdout.write(self.style.SUCCESS('Бот остановлен пользователем'))
-        except Exception as e:
-            self.stdout.write(
-                self.style.ERROR(f'Ошибка запуска бота: {e}')
-            )
-
-
-def main():
-    """Основная функция запуска бота"""
-    bot = ConnectBot()
-    
-    try:
-        asyncio.run(bot.run())
-    except KeyboardInterrupt:
-        logger.info("Бот остановлен пользователем")
-    except Exception as e:
-        logger.error(f"Ошибка запуска бота: {e}")
-
-if __name__ == "__main__":
-    main()
+        bot.run()

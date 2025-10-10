@@ -1,0 +1,30 @@
+[
+    {
+        "id": 1,
+        "full_name": "Иван Иванов",
+        "position": "Разработчик",
+        "department": "IT",
+        "is_active": true
+    },
+    {
+        "id": 2,
+        "full_name": "Петр Петров",
+        "position": "HR-менеджер",
+        "department": "HR",
+        "is_active": true
+    },
+    {
+        "id": 3,
+        "full_name": "Анна Сидорова",
+        "position": "Дизайнер",
+        "department": "Design",
+        "is_active": true
+    },
+    {
+        "id": 4,
+        "full_name": "Михаил Козлов",
+        "position": "Аналитик",
+        "department": "Analytics",
+        "is_active": true
+    }
+]

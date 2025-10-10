@@ -3,6 +3,10 @@
 """
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from .redis_utils import RedisManager
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 class Department(models.Model):
@@ -94,10 +98,15 @@ class Employee(models.Model):
         return f"{self.full_name} ({self.position or 'Нет должности'})"
     
     def save(self, *args, **kwargs):
-        """Переопределяем save для нормализации username"""
+        """Переопределяем save для нормализации username и очистки кеша"""
         if self.telegram_username:
             self.normalized_username = self.normalize_username(self.telegram_username)
+        
         super().save(*args, **kwargs)
+        
+        # Очищаем кеш при изменении данных сотрудника
+        if self.telegram_id:
+            RedisManager.invalidate_employee_cache(self.telegram_id)
     
     @staticmethod
     def normalize_username(username):
@@ -107,8 +116,16 @@ class Employee(models.Model):
         return username.strip().lstrip('@').lower().replace('_', '').replace('-', '').replace('.', '')
     
     def get_interests_list(self):
-        """Получить список активных интересов сотрудника"""
-        return [ei.interest for ei in self.interests.filter(is_active=True)]
+        """Получить список активных интересов сотрудника с кешированием"""
+        # Пытаемся получить из кеша
+        interests = RedisManager.get_employee_interests(self.id)
+        if interests is not None:
+            return interests
+        
+        # Загружаем из БД и кешируем
+        interests = [ei.interest for ei in self.interests.filter(is_active=True)]
+        RedisManager.cache_employee_interests(self.id, interests)
+        return interests
     
     def get_activity_stats(self):
         """Получить статистику активностей сотрудника"""
@@ -119,7 +136,7 @@ class Employee(models.Model):
     def find_by_telegram_data(cls, telegram_user):
         """
         Поиск сотрудника по данным Telegram пользователя
-        с использованием relaxed matching
+        с использованием relaxed matching и кеширования
         """
         if not telegram_user:
             return None
@@ -130,12 +147,26 @@ class Employee(models.Model):
         # Сначала пробуем найти по telegram_id (самый надежный способ)
         if user_id:
             try:
+                # Проверяем кеш сначала
+                employee_data = RedisManager.get_employee_data(user_id)
+                if employee_data:
+                    return cls.objects.get(id=employee_data['id'])
+                
                 employee = cls.objects.filter(telegram_id=user_id, is_active=True).first()
                 if employee:
+                    # Кешируем найденного сотрудника
+                    RedisManager.cache_employee_data(
+                        user_id, 
+                        {
+                            'id': employee.id,
+                            'full_name': employee.full_name,
+                            'position': employee.position,
+                            'telegram_id': employee.telegram_id,
+                            'telegram_username': employee.telegram_username,
+                        }
+                    )
                     return employee
             except Exception as e:
-                import logging
-                logger = logging.getLogger(__name__)
                 logger.error(f"Ошибка поиска по telegram_id {user_id}: {e}")
         
         # Поиск по username
@@ -352,8 +383,24 @@ class Activity(models.Model):
         return f"{self.get_activity_type_display()}: {self.title} ({self.scheduled_date})"
     
     def get_participants_count(self):
-        """Количество подтвердивших участников"""
-        return self.participants.filter(status='confirmed').count()
+        """Количество подтвердивших участников с кешированием"""
+        # Пытаемся получить из кеша
+        participants = RedisManager.get_activity_participants(self.id)
+        if participants is not None:
+            return len([p for p in participants if p.get('status') == 'confirmed'])
+        
+        # Загружаем из БД и кешируем
+        participants_data = []
+        for p in self.participants.all():
+            participants_data.append({
+                'id': p.id,
+                'employee_id': p.employee.id,
+                'employee_name': p.employee.full_name,
+                'status': p.status
+            })
+        
+        RedisManager.cache_activity_participants(self.id, participants_data)
+        return len([p for p in participants_data if p.get('status') == 'confirmed'])
     
     def is_fully_booked(self):
         """Проверка, заполнена ли активность"""
@@ -500,3 +547,240 @@ class BotAdmin(models.Model):
     def __str__(self):
         admin_type = "🤴 Супер-админ" if self.is_super_admin else "👨💼 Админ"
         return f"{admin_type}: {self.employee.full_name}"
+
+
+# === Система "Тайный кофе" ===
+
+class SecretCoffee(models.Model):
+    """Еженедельная сессия тайного кофе"""
+    
+    week_start = models.DateField("Начало недели", help_text="Понедельник недели, для которой создаются пары")
+    title = models.CharField("Название сессии", max_length=200, blank=True)
+    description = models.TextField("Описание", blank=True)
+    
+    # Статус сессии
+    STATUS_CHOICES = [
+        ('draft', 'Черновик'),
+        ('active', 'Активная'),
+        ('completed', 'Завершена'),
+        ('cancelled', 'Отменена'),
+    ]
+    status = models.CharField("Статус", max_length=20, choices=STATUS_CHOICES, default='draft')
+    
+    # Настройки создания пар
+    max_pairs = models.IntegerField("Максимум пар", default=50, help_text="Максимальное количество пар для сессии")
+    algorithm_used = models.CharField(
+        "Использованный алгоритм", 
+        max_length=50, 
+        blank=True,
+        help_text="Алгоритм, использованный для создания пар"
+    )
+    
+    # Временные рамки
+    registration_deadline = models.DateTimeField("Дедлайн регистрации", blank=True, null=True)
+    meeting_deadline = models.DateField("Дедлайн встреч", blank=True, null=True)
+    
+    # Статистика
+    total_participants = models.IntegerField("Всего участников", default=0)
+    successful_pairs = models.IntegerField("Успешных пар", default=0)
+    
+    # Системные поля
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлено", auto_now=True)
+    created_by = models.ForeignKey(
+        Employee,
+        on_delete=models.SET_NULL,
+        verbose_name="Создано",
+        blank=True,
+        null=True,
+        related_name='created_coffee_sessions'
+    )
+    
+    class Meta:
+        verbose_name = "Сессия тайного кофе"
+        verbose_name_plural = "Сессии тайного кофе"
+        ordering = ['-week_start']
+        unique_together = ['week_start']  # Одна сессия на неделю
+        indexes = [
+            models.Index(fields=['week_start', 'status']),
+            models.Index(fields=['status', 'created_at']),
+        ]
+    
+    def __str__(self):
+        title = self.title or f"Тайный кофе на неделю {self.week_start.strftime('%d.%m.%Y')}"
+        return f"{title} ({self.get_status_display()})"
+    
+    def save(self, *args, **kwargs):
+        """Автоматически создаем название если не указано"""
+        if not self.title:
+            self.title = f"Тайный кофе на неделю {self.week_start.strftime('%d.%m.%Y')}"
+        super().save(*args, **kwargs)
+    
+    def get_pairs_count(self):
+        """Количество созданных пар"""
+        return self.coffee_pairs.count()
+    
+    def get_confirmed_pairs_count(self):
+        """Количество подтвержденных пар (обе стороны подтвердили)"""
+        return self.coffee_pairs.filter(
+            confirmed_employee1=True,
+            confirmed_employee2=True
+        ).count()
+    
+    def get_participation_rate(self):
+        """Процент участия (отношение подтвержденных к общему числу)"""
+        total = self.get_pairs_count()
+        if total == 0:
+            return 0
+        confirmed = self.get_confirmed_pairs_count()
+        return round((confirmed / total) * 100, 1)
+
+
+class CoffeePair(models.Model):
+    """Пара сотрудников для тайного кофе"""
+    
+    secret_coffee = models.ForeignKey(
+        SecretCoffee, 
+        on_delete=models.CASCADE, 
+        related_name='coffee_pairs',
+        verbose_name="Сессия тайного кофе"
+    )
+    employee1 = models.ForeignKey(
+        Employee, 
+        on_delete=models.CASCADE, 
+        related_name='coffee_pairs_as_first',
+        verbose_name="Первый сотрудник"
+    )
+    employee2 = models.ForeignKey(
+        Employee, 
+        on_delete=models.CASCADE, 
+        related_name='coffee_pairs_as_second',
+        verbose_name="Второй сотрудник"
+    )
+    
+    # Подтверждения участников
+    confirmed_employee1 = models.BooleanField("Подтверждение от первого", default=False)
+    confirmed_employee2 = models.BooleanField("Подтверждение от второго", default=False)
+    
+    # Чат и коммуникация
+    chat_created = models.BooleanField("Чат создан", default=False)
+    chat_id = models.BigIntegerField("ID чата", blank=True, null=True)
+    
+    # Информация о встрече
+    meeting_scheduled = models.BooleanField("Встреча запланирована", default=False)
+    meeting_date = models.DateTimeField("Дата встречи", blank=True, null=True)
+    meeting_place = models.CharField("Место встречи", max_length=200, blank=True)
+    meeting_completed = models.BooleanField("Встреча состоялась", default=False)
+    
+    # Обратная связь
+    feedback_employee1 = models.TextField("Отзыв первого сотрудника", blank=True)
+    feedback_employee2 = models.TextField("Отзыв второго сотрудника", blank=True)
+    rating_employee1 = models.IntegerField(
+        "Оценка от первого", 
+        blank=True, 
+        null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Оценка от 1 до 5"
+    )
+    rating_employee2 = models.IntegerField(
+        "Оценка от второго", 
+        blank=True, 
+        null=True,
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Оценка от 1 до 5"
+    )
+    
+    # Алгоритм matching
+    match_score = models.FloatField("Оценка совместимости", default=0.0, help_text="Оценка алгоритма от 0 до 1")
+    match_reason = models.TextField("Причина объединения в пару", blank=True)
+    
+    # Статус пары
+    STATUS_CHOICES = [
+        ('created', 'Создана'),
+        ('notified', 'Уведомления отправлены'),
+        ('confirmed', 'Подтверждена'),
+        ('meeting_scheduled', 'Встреча запланирована'),
+        ('completed', 'Завершена'),
+        ('declined', 'Отказались'),
+        ('expired', 'Просрочена'),
+    ]
+    status = models.CharField("Статус", max_length=20, choices=STATUS_CHOICES, default='created')
+    
+    # Временные метки
+    created_at = models.DateTimeField("Создано", auto_now_add=True)
+    notified_at = models.DateTimeField("Уведомления отправлены", blank=True, null=True)
+    confirmed_at = models.DateTimeField("Подтверждено", blank=True, null=True)
+    completed_at = models.DateTimeField("Завершено", blank=True, null=True)
+    
+    class Meta:
+        verbose_name = "Пара для тайного кофе"
+        verbose_name_plural = "Пары для тайного кофе"
+        ordering = ['-created_at']
+        unique_together = [
+            ['secret_coffee', 'employee1', 'employee2']  # Уникальная пара в рамках сессии
+        ]
+        indexes = [
+            models.Index(fields=['secret_coffee', 'status']),
+            models.Index(fields=['employee1', 'status']),
+            models.Index(fields=['employee2', 'status']),
+            models.Index(fields=['status', 'created_at']),
+        ]
+    
+    def __str__(self):
+        return f"{self.employee1.full_name} ↔ {self.employee2.full_name} ({self.secret_coffee.week_start})"
+    
+    def save(self, *args, **kwargs):
+        """Валидация и обновление статусов при сохранении"""
+        # Проверяем, что сотрудники разные
+        if self.employee1_id == self.employee2_id:
+            raise ValueError("Сотрудник не может быть в паре с самим собой")
+        
+        # Обновляем статус на основе подтверждений
+        if self.confirmed_employee1 and self.confirmed_employee2 and self.status == 'notified':
+            self.status = 'confirmed'
+            self.confirmed_at = models.functions.Now()
+        
+        super().save(*args, **kwargs)
+    
+    def is_fully_confirmed(self):
+        """Проверка, подтвердили ли оба участника"""
+        return self.confirmed_employee1 and self.confirmed_employee2
+    
+    def has_feedback_from_both(self):
+        """Проверка, оставили ли оба участника обратную связь"""
+        return bool(self.feedback_employee1) and bool(self.feedback_employee2)
+    
+    def get_average_rating(self):
+        """Средняя оценка от обоих участников"""
+        ratings = [r for r in [self.rating_employee1, self.rating_employee2] if r is not None]
+        if not ratings:
+            return None
+        return sum(ratings) / len(ratings)
+    
+    def get_other_employee(self, current_employee):
+        """Получить второго сотрудника в паре"""
+        if current_employee.id == self.employee1_id:
+            return self.employee2
+        elif current_employee.id == self.employee2_id:
+            return self.employee1
+        return None
+    
+    def can_be_confirmed_by(self, employee):
+        """Может ли сотрудник подтвердить участие в паре"""
+        if employee.id == self.employee1_id:
+            return not self.confirmed_employee1
+        elif employee.id == self.employee2_id:
+            return not self.confirmed_employee2
+        return False
+    
+    def confirm_by_employee(self, employee):
+        """Подтверждение участия от конкретного сотрудника"""
+        if employee.id == self.employee1_id and not self.confirmed_employee1:
+            self.confirmed_employee1 = True
+            self.save()
+            return True
+        elif employee.id == self.employee2_id and not self.confirmed_employee2:
+            self.confirmed_employee2 = True
+            self.save()
+            return True
+        return False

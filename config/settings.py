@@ -61,6 +61,37 @@ DATABASES = {
     }
 }
 
+# Redis Configuration
+REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+
+# Java Service Configuration
+JAVA_SERVICE_URL = config('JAVA_SERVICE_URL', default='http://localhost:8080')
+
+# Cache Configuration with Redis
+CACHES = {
+    'default': {
+        'BACKEND': 'django_redis.cache.RedisCache',
+        'LOCATION': REDIS_URL,
+        'OPTIONS': {
+            'CLIENT_CLASS': 'django_redis.client.DefaultClient',
+            'CONNECTION_POOL_KWARGS': {
+                'max_connections': 20,
+                'socket_connect_timeout': 5,
+                'socket_timeout': 5,
+            },
+            'COMPRESSOR': 'django_redis.compressors.zlib.ZlibCompressor',
+            'IGNORE_EXCEPTIONS': True,
+        },
+        'KEY_PREFIX': 'connectbot',
+        'TIMEOUT': 300,
+    }
+}
+
+# Session engine - use Redis for session storage
+SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
+SESSION_CACHE_ALIAS = 'default'
+SESSION_COOKIE_AGE = 86400  # 24 hours
+
 # Password validation
 AUTH_PASSWORD_VALIDATORS = [
     {
@@ -181,12 +212,13 @@ EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
 DEFAULT_FROM_EMAIL = config('DEFAULT_FROM_EMAIL', default='noreply@company.com')
 
-# Cache settings (for future optimization)
-CACHES = {
-    'default': {
-        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
-        'LOCATION': 'unique-snowflake',
-    }
+# Cache timeout settings
+CACHE_TTL = {
+    'default': 300,  # 5 minutes
+    'user_menu': 1800,  # 30 minutes
+    'user_profile': 3600,  # 1 hour
+    'activities': 900,  # 15 minutes
+    'temporary_data': 1800,  # 30 minutes
 }
 
 # Internationalization

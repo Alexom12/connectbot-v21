@@ -7,3 +7,7 @@ asgiref>=3.7.0
 setuptools<81
 openpyxl>=3.0.0
 python-decouple>=3.8
+
+# Redis support
+redis>=5.0.0
+django-redis>=5.4.0

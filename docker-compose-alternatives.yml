@@ -1,0 +1,109 @@
+# Альтернативные варианты Docker Compose для ConnectBot v21
+# Используйте если стандартный redis:alpine не работает
+
+# ============================================================================
+# Вариант 1: Bitnami Redis (более надежный для корпоративных сетей)
+# ============================================================================
+version: '3.8'
+services:
+  redis-bitnami:
+    image: bitnami/redis:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/bitnami/redis/data
+    environment:
+      - ALLOW_EMPTY_PASSWORD=yes  # Только для разработки!
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+
+---
+
+# ============================================================================  
+# Вариант 2: KeyDB (Redis-совместимый, может работать лучше)
+# ============================================================================
+version: '3.8'
+services:
+  keydb:
+    image: eqalpha/keydb:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "keydb-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+
+---
+
+# ============================================================================
+# Вариант 3: Redis Stack (расширенная версия Redis)
+# ============================================================================
+version: '3.8'
+services:
+  redis-stack:
+    image: redis/redis-stack-server:latest
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+
+---
+
+# ============================================================================
+# Вариант 4: Только для локальной разработки (без Redis)
+# ============================================================================
+version: '3.8'
+services:
+  matching-service-only:
+    build: ./connectbot-java-services/matching-service
+    ports:
+      - "8080:8080"
+    environment:
+      - SPRING_PROFILES_ACTIVE=local
+      - SPRING_DATA_REDIS_HOST=localhost  # Подключение к локальному Redis
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/matching/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+# ============================================================================
+# Инструкции по использованию:
+# ============================================================================
+
+# Использование альтернативных вариантов:
+# 1. Скопируйте нужный блок в docker-compose.override.yml
+# 2. Или замените содержимое docker-compose.yml
+# 3. Запустите: docker-compose up -d
+
+# Для Bitnami:
+# docker-compose -f docker-compose.bitnami.yml up -d
+
+# Для KeyDB:  
+# docker-compose -f docker-compose.keydb.yml up -d
+
+# Только Java сервис:
+# docker-compose -f docker-compose.local.yml up -d
