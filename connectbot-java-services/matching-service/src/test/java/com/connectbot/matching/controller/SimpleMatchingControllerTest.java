@@ -65,9 +65,9 @@ class SimpleMatchingControllerTest {
     @Test
     void testGetAlgorithms_Success() throws Exception {
         mockMvc.perform(get("/api/matching/algorithms"))
-                .andExpected(status().isOk())
+                .andExpect(status().isOk())
                 .andExpect(content().contentType(MediaType.APPLICATION_JSON))
-                .andExpected(jsonPath("$.algorithms").exists())
+                .andExpect(jsonPath("$.algorithms").exists())
                 .andExpect(jsonPath("$.total").value(3));
     }
 
