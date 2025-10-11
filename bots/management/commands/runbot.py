@@ -1,12 +1,18 @@
 """
-Основной модуль Telegram бота ConnectBot
+Основной модуль Telegram бота ConnectBot v21 с планировщиком задач
 """
+import os
 import asyncio
 import logging
+import signal
+import sys
 from django.conf import settings
-from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes
-from asgiref.sync import sync_to_async
+
+# Настройка Django
+os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
+
+import django
+django.setup()
 
 logger = logging.getLogger(__name__)
 
@@ -14,113 +20,171 @@ class ConnectBot:
     def __init__(self):
         self.token = settings.TELEGRAM_BOT_TOKEN
         self.application = None
+        self.scheduler = None
     
-    async def start(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /start"""
-        user = update.effective_user
-        
+    async def initialize(self):
+        """Инициализация бота и планировщика"""
         try:
-            # Поиск сотрудника в базе
-            employee = await self.find_employee_by_user(user)
+            # Импорты внутри функции чтобы избежать циклических импортов
+            from bots.bot_instance import create_bot_application
+            from bots.services.scheduler_service import scheduler_service
             
-            if employee:
-                await update.message.reply_text(
-                    f"Добро пожаловать, {employee.full_name}! 🎉\n"
-                    "Вы успешно авторизованы в ConnectBot."
-                )
-                # Здесь будет переход к настройке предпочтений
-            else:
-                await update.message.reply_text(
-                    "🔐 *Доступ к ConnectBot ограничен*\n\n"
-                    "Для использования бота необходимо быть сотрудником компании.\n"
-                    "Если вы сотрудник, но не можете войти, обратитесь к администратору."
-                )
-                
+            logger.info("🚀 Инициализация ConnectBot v21...")
+            
+            # Создаем приложение бота
+            self.application = create_bot_application()
+            if not self.application:
+                logger.error("❌ Не удалось создать приложение бота")
+                return False
+            
+            # Инициализируем планировщик
+            self.scheduler = scheduler_service
+            logger.info("✅ Бот и планировщик инициализированы")
+            
+            return True
+            
         except Exception as e:
-            logger.error(f"Ошибка в команде /start: {e}")
-            await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
+            logger.error(f"❌ Ошибка инициализации: {e}")
+            return False
     
-    @sync_to_async
-    def find_employee_by_user(self, user):
-        """Поиск сотрудника по данным Telegram пользователя"""
-        from employees.models import Employee
-        
-        username = user.username
-        
-        if not username:
-            return None
-        
-        # Нормализация username
-        normalized_username = self.normalize_username(username)
-        
+    async def start_services(self):
+        """Запуск всех сервисов бота"""
         try:
-            # Поиск по точному совпадению
-            employee = Employee.objects.filter(
-                telegram_username__iexact=username
-            ).first()
+            logger.info("📦 Запуск сервисов ConnectBot...")
             
-            if employee:
-                # Обновляем telegram_id если нужно
-                if not employee.telegram_id:
-                    employee.telegram_id = user.id
-                    employee.save()
-                return employee
+            # Запускаем планировщик задач
+            self.scheduler.start_scheduler()
             
-            # Relaxed matching поиск
-            employees = Employee.objects.all()
-            matches = []
+            # Проверяем статус планировщика
+            status = self.scheduler.get_scheduler_status()
+            logger.info(f"📅 Планировщик: {status['status']}, задач: {status['job_count']}")
             
-            for emp in employees:
-                if emp.telegram_username:
-                    emp_normalized = self.normalize_username(emp.telegram_username)
-                    if emp_normalized == normalized_username:
-                        matches.append(emp)
+            # Показываем информацию о задачах
+            for job in status['jobs']:
+                logger.info(f"   🎯 {job['name']} -> {job['next_run']}")
             
-            if len(matches) == 1:
-                employee = matches[0]
-                if not employee.telegram_id:
-                    employee.telegram_id = user.id
-                    employee.save()
-                return employee
-                
+            # Запускаем немедленное создание сессий при старте
+            await self.scheduler._create_weekly_sessions_async()
+            
+            logger.info("✅ Все сервисы успешно запущены")
+            return True
+            
         except Exception as e:
-            logger.error(f"Ошибка поиска сотрудника: {e}")
+            logger.error(f"❌ Ошибка запуска сервисов: {e}")
+            return False
+    
+    async def stop_services(self):
+        """Остановка всех сервисов бота"""
+        try:
+            logger.info("🛑 Остановка сервисов ConnectBot...")
             
-        return None
+            if self.scheduler:
+                self.scheduler.stop_scheduler()
+                logger.info("✅ Планировщик остановлен")
+            
+            logger.info("✅ Все сервисы остановлены")
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка остановки сервисов: {e}")
     
-    def normalize_username(self, username):
-        """Нормализация username для поиска"""
-        if not username:
-            return ""
-        return username.strip().lstrip('@').lower().replace('_', '').replace('-', '').replace('.', '')
-    
-    def setup_handlers(self):
-        """Настройка обработчиков команд"""
-        self.application.add_handler(CommandHandler("start", self.start))
-        # Здесь будут добавлены другие обработчики
+    async def run_bot(self):
+        """Запуск polling бота"""
+        try:
+            if not self.application:
+                logger.error("❌ Приложение бота не инициализировано")
+                return
+            
+            logger.info("🤖 Запуск Telegram бота (polling)...")
+            await self.application.run_polling(
+                drop_pending_updates=True,
+                allowed_updates=['message', 'callback_query', 'chat_member']
+            )
+            
+        except Exception as e:
+            logger.error(f"❌ Ошибка работы бота: {e}")
+            raise
     
     async def run(self):
-        """Запуск бота"""
-        if not self.token:
-            logger.error("TELEGRAM_BOT_TOKEN не установлен")
-            return
-        
-        self.application = Application.builder().token(self.token).build()
-        self.setup_handlers()
-        
-        logger.info("Бот запущен и ожидает сообщений...")
-        await self.application.run_polling()
+        """Основной метод запуска бота"""
+        try:
+            # Инициализация
+            if not await self.initialize():
+                return
+            
+            # Запуск сервисов
+            if not await self.start_services():
+                return
+            
+            # Запуск бота
+            await self.run_bot()
+            
+        except KeyboardInterrupt:
+            logger.info("⏹️ Остановка по команде пользователя...")
+        except Exception as e:
+            logger.error(f"💥 Критическая ошибка: {e}")
+        finally:
+            # Гарантированная остановка сервисов
+            await self.stop_services()
+            logger.info("👋 ConnectBot завершил работу")
+
+def signal_handler(signum, frame):
+    """Обработчик сигналов для graceful shutdown"""
+    print(f"\n🛑 Получен сигнал {signum}. Остановка ConnectBot...")
+    
+    # Останавливаем event loop
+    loop = asyncio.get_event_loop()
+    for task in asyncio.all_tasks(loop):
+        task.cancel()
+    
+    sys.exit(0)
+
+def setup_logging():
+    """Настройка логирования"""
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.StreamHandler(sys.stdout),
+            logging.FileHandler('logs/bot.log', encoding='utf-8')
+        ]
+    )
 
 def main():
     """Основная функция запуска бота"""
+    # Настройка логирования
+    setup_logging()
+    
+    # Регистрация обработчиков сигналов
+    signal.signal(signal.SIGINT, signal_handler)
+    signal.signal(signal.SIGTERM, signal_handler)
+    
+    # Создание и запуск бота
     bot = ConnectBot()
     
     try:
+        # Запуск асинхронного бота
         asyncio.run(bot.run())
     except KeyboardInterrupt:
-        logger.info("Бот остановлен пользователем")
+        logger.info("⏹️ Остановка по команде пользователя")
     except Exception as e:
-        logger.error(f"Ошибка запуска бота: {e}")
+        logger.error(f"💥 Фатальная ошибка: {e}")
+        sys.exit(1)
 
 if __name__ == "__main__":
+    # Проверка токена бота
+    if not settings.TELEGRAM_BOT_TOKEN:
+        print("❌ Ошибка: TELEGRAM_BOT_TOKEN не установлен в настройках")
+        print("💡 Добавьте TELEGRAM_BOT_TOKEN=ваш_токен в файл .env")
+        sys.exit(1)
+    
+    # Проверка существования папки logs
+    os.makedirs('logs', exist_ok=True)
+    
+    print("""
+    🚀 ConnectBot v21
+    📅 Система корпоративных активностей
+    🤖 Тайный кофе • Шахматы • Мероприятия
+    🔧 Версия с планировщиком задач
+    """)
+    
     main()

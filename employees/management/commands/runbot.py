@@ -38,16 +38,23 @@ class ConnectBot:
         """Обработчик сигналов для корректного завершения"""
         logger.info(f"Получен сигнал {signum}, останавливаем бот...")
         self.running = False
-        
-        if self.application and self.application.updater:
-            asyncio.create_task(self.shutdown())
+        # Используем более мягкий способ остановки
+        if hasattr(self, 'application') and self.application:
+            try:
+                self.application.stop_running()
+            except Exception as e:
+                logger.error(f"Ошибка при остановке: {e}")
     
     async def shutdown(self):
         """Корректное завершение работы бота"""
         try:
-            if self.application:
-                await self.application.stop()
-                await self.application.shutdown()
+            logger.info("Начинаем корректное завершение...")
+            if hasattr(self, 'application') and self.application:
+                # Останавливаем polling и приложение
+                if self.application.running:
+                    await self.application.stop()
+                if not self.application._initialized:
+                    await self.application.shutdown()
             logger.info("Бот корректно остановлен")
         except Exception as e:
             logger.error(f"Ошибка при завершении: {e}")
@@ -541,9 +548,16 @@ class ConnectBot:
     
     async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Глобальный обработчик ошибок"""
+        # Игнорируем ошибки HTTPXRequest во время завершения
+        error_str = str(context.error)
+        if ("HTTPXRequest" in error_str or 
+            "httpx" in error_str.lower() or 
+            not self.running):
+            return
+            
         logger.error(f"Необработанная ошибка: {context.error}")
         
-        if update and update.effective_message:
+        if update and update.effective_message and self.running:
             try:
                 await update.effective_message.reply_text(
                     "Произошла техническая ошибка. Администратор уведомлен."
@@ -578,16 +592,22 @@ class ConnectBot:
             logger.info("ConnectBot запущен и готов к работе!")
             
             # Запускаем polling - это блокирующий вызов
-            self.application.run_polling(
-                poll_interval=2.0,      # Интервал между запросами
-                timeout=10,             # Таймаут long polling
-                drop_pending_updates=True  # Сбрасываем старые обновления
-            )
+            try:
+                self.application.run_polling(
+                    poll_interval=2.0,      # Интервал между запросами
+                    timeout=10,             # Таймаут long polling
+                    drop_pending_updates=True,  # Сбрасываем старые обновления
+                    close_loop=False       # Не закрываем event loop принудительно
+                )
+            except KeyboardInterrupt:
+                logger.info("Получение Ctrl+C, корректно завершаем...")
+                self.running = False
             
         except KeyboardInterrupt:
             logger.info("Получен сигнал остановки от пользователя")
         except Exception as e:
-            logger.error(f"Критическая ошибка: {e}")
+            if self.running:  # Логируем только если бот еще работает
+                logger.error(f"Критическая ошибка: {e}")
         finally:
             logger.info("ConnectBot остановлен")
 

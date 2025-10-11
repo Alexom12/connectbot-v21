@@ -24,6 +24,7 @@ INSTALLED_APPS = [
     # Custom apps
     'employees',
     'bots',
+    'activities',  # Добавлено новое приложение для активностей
 ]
 
 MIDDLEWARE = [
@@ -186,6 +187,11 @@ LOGGING = {
         'employees': {
             'handlers': ['file', 'console'],
             'level': 'INFO',
+            'propagate': False,
+        },
+        'activities': {  # Добавлен логгер для activities
+            'handlers': ['file', 'console', 'error_file'],
+            'level': 'DEBUG' if DEBUG else 'INFO',
             'propagate': False,
         },
     },
