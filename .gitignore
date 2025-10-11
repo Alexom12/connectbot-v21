@@ -33,3 +33,10 @@ data/export/*.csv
 
 # Environment variables
 .env
+
+# Java Build Artifacts
+connectbot-java-services/*/target/
+!connectbot-java-services/*/target/maven-archiver/
+*.class
+*.jar
+!connectbot-java-services/*/.mvn/wrapper/maven-wrapper.jar
