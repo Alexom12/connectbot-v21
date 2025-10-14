@@ -40,3 +40,14 @@ connectbot-java-services/*/target/
 *.class
 *.jar
 !connectbot-java-services/*/.mvn/wrapper/maven-wrapper.jar
+
+# Test files
+test_*.py
+*_test.py
+testing/
+
+# Temporary files  
+*.tmp
+*.temp
+*~
+.cache/
