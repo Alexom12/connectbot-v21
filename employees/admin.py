@@ -1,8 +1,9 @@
 from django.contrib import admin
+from django.utils.html import format_html
 from .models import (
     Employee, Interest, EmployeeInterest, Department, BusinessCenter,
     Activity, ActivityParticipant, Achievement, EmployeeAchievement, BotAdmin,
-    SecretCoffee, CoffeePair
+    SecretCoffee, CoffeePair, AdminUser, AdminLog
 )
 
 
@@ -69,7 +70,92 @@ class BotAdminAdmin(admin.ModelAdmin):
     search_fields = ['employee__full_name']
 
 
-# === Система "Тайный кофе" ===
+# === СИСТЕМА АДМИНИСТРАТОРОВ ===
+
+@admin.register(AdminUser)
+class AdminUserAdmin(admin.ModelAdmin):
+    """Админка для управления администраторами"""
+    list_display = [
+        'get_user_name', 
+        'get_telegram_username', 
+        'role', 
+        'is_active', 
+        'created_at', 
+        'admin_actions'
+    ]
+    list_filter = ['role', 'is_active', 'created_at']
+    search_fields = ['user__full_name', 'user__telegram_username']
+    list_editable = ['role', 'is_active']
+    readonly_fields = ['created_at', 'updated_at']
+    fieldsets = (
+        ('Основная информация', {
+            'fields': ('user', 'role', 'is_active')
+        }),
+        ('Права доступа', {
+            'fields': ('permissions',),
+            'classes': ('collapse',)
+        }),
+        ('Даты', {
+            'fields': ('created_at', 'updated_at'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def get_user_name(self, obj):
+        return obj.user.full_name
+    get_user_name.short_description = 'Сотрудник'
+    get_user_name.admin_order_field = 'user__full_name'
+
+    def get_telegram_username(self, obj):
+        return f"@{obj.user.telegram_username}"
+    get_telegram_username.short_description = 'Telegram'
+    get_telegram_username.admin_order_field = 'user__telegram_username'
+
+    def admin_actions(self, obj):
+        return format_html(
+            '<a href="/admin/employees/adminuser/{}/change/">✏️</a> '
+            '<a href="/admin/employees/adminuser/{}/delete/">🗑️</a>',
+            obj.id, obj.id
+        )
+    admin_actions.short_description = 'Действия'
+
+
+@admin.register(AdminLog)
+class AdminLogAdmin(admin.ModelAdmin):
+    """Админка для просмотра логов администраторов"""
+    list_display = [
+        'admin_name',
+        'action',
+        'command',
+        'target_type',
+        'created_at'
+    ]
+    list_filter = ['action', 'created_at', 'admin__role']
+    search_fields = [
+        'admin__user__full_name', 
+        'command', 
+        'target_type',
+        'details'
+    ]
+    readonly_fields = ['created_at', 'ip_address']
+    date_hierarchy = 'created_at'
+
+    def admin_name(self, obj):
+        return obj.admin.user.full_name
+    admin_name.short_description = 'Администратор'
+    admin_name.admin_order_field = 'admin__user__full_name'
+
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return request.user.is_superuser
+
+
+# === СИСТЕМА "ТАЙНЫЙ КОФЕ" ===
 
 class CoffeePairInline(admin.TabularInline):
     """Inline для отображения пар в админке сессий"""

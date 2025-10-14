@@ -3,6 +3,7 @@
 """
 from django.db import models
 from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils.html import format_html
 from .redis_utils import RedisManager
 import logging
 
@@ -547,6 +548,95 @@ class BotAdmin(models.Model):
     def __str__(self):
         admin_type = "🤴 Супер-админ" if self.is_super_admin else "👨💼 Админ"
         return f"{admin_type}: {self.employee.full_name}"
+
+
+# === СИСТЕМА АДМИНИСТРАТОРОВ ===
+
+class AdminUser(models.Model):
+    """Модель администраторов системы"""
+    ROLE_CHOICES = [
+        ('superadmin', 'Супер администратор'),
+        ('admin', 'Администратор'),
+        ('moderator', 'Модератор'),
+    ]
+    
+    user = models.OneToOneField('Employee', on_delete=models.CASCADE, related_name='admin_profile')
+    role = models.CharField("Роль", max_length=20, choices=ROLE_CHOICES, default='moderator')
+    permissions = models.JSONField("Права доступа", default=list, blank=True)
+    is_active = models.BooleanField("Активен", default=True)
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+    updated_at = models.DateTimeField("Обновлен", auto_now=True)
+
+    class Meta:
+        db_table = 'admin_users'
+        verbose_name = 'Администратор'
+        verbose_name_plural = 'Администраторы'
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.user.full_name} ({self.role})"
+
+    def has_permission(self, permission):
+        """Проверка прав доступа"""
+        if self.role == 'superadmin':
+            return True
+        return permission in self.permissions
+
+    def get_role_display_with_emoji(self):
+        """Отображение роли с эмодзи"""
+        emoji_map = {
+            'superadmin': '👑',
+            'admin': '🔧', 
+            'moderator': '👁️'
+        }
+        emoji = emoji_map.get(self.role, '👤')
+        return f"{emoji} {self.get_role_display()}"
+
+
+class AdminLog(models.Model):
+    """Модель логов действий администраторов"""
+    ACTION_CHOICES = [
+        ('login', 'Вход в систему'),
+        ('command', 'Выполнение команды'),
+        ('manage', 'Управление объектом'),
+        ('system', 'Системное действие'),
+        ('error', 'Ошибка'),
+    ]
+    
+    admin = models.ForeignKey(AdminUser, on_delete=models.CASCADE, related_name='logs', verbose_name="Администратор")
+    action = models.CharField("Действие", max_length=50, choices=ACTION_CHOICES)
+    command = models.CharField("Команда", max_length=100, blank=True)
+    target_type = models.CharField("Тип объекта", max_length=50, blank=True)
+    target_id = models.IntegerField("ID объекта", null=True, blank=True)
+    details = models.JSONField("Детали", default=dict)
+    ip_address = models.GenericIPAddressField("IP адрес", null=True, blank=True)
+    created_at = models.DateTimeField("Создан", auto_now_add=True)
+
+    class Meta:
+        db_table = 'admin_logs'
+        verbose_name = 'Лог администратора'
+        verbose_name_plural = 'Логи администраторов'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['admin', 'created_at']),
+            models.Index(fields=['action', 'created_at']),
+            models.Index(fields=['target_type', 'target_id']),
+        ]
+
+    def __str__(self):
+        return f"{self.admin.user.full_name} - {self.action} - {self.created_at.strftime('%d.%m.%Y %H:%M')}"
+
+    def get_action_display_with_emoji(self):
+        """Отображение действия с эмодзи"""
+        emoji_map = {
+            'login': '🔐',
+            'command': '⌨️',
+            'manage': '⚙️',
+            'system': '🖥️',
+            'error': '❌'
+        }
+        emoji = emoji_map.get(self.action, '📝')
+        return f"{emoji} {self.get_action_display()}"
 
 
 # === Система "Тайный кофе" ===
