@@ -1,0 +1,66 @@
+name: E2E smoke tests
+
+on:
+  push:
+    paths:
+      - '**'
+  workflow_dispatch:
+
+jobs:
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '21'
+
+      - name: Make mvnw executable
+        run: |
+          if [ -f connectbot-java-services/matching-service/mvnw ]; then chmod +x connectbot-java-services/matching-service/mvnw; fi
+
+      - name: Build Java matching-service
+        run: |
+          if [ -f connectbot-java-services/matching-service/mvnw ]; then
+            ./connectbot-java-services/matching-service/mvnw -f connectbot-java-services/matching-service/pom.xml -DskipTests package;
+          else
+            echo 'No mvnw found, skipping java build';
+          fi
+
+      - name: Start docker-compose
+        run: |
+          docker compose -f docker/docker-compose.yml up --build -d
+
+      - name: Wait for services
+        run: |
+          echo 'Waiting for services to become healthy...'
+          for i in {1..60}; do
+            if curl -sSf http://localhost:8000/api/v1/data/health >/dev/null 2>&1 && curl -sSf http://localhost:8081/api/v1/matching/health >/dev/null 2>&1; then
+              echo 'services healthy';
+              break;
+            fi
+            sleep 2
+          done
+
+      - name: Run smoke test (Data API)
+        env:
+          SERVICE_AUTH_TOKEN: test-token
+        run: |
+          set -e
+          echo 'Posting to Data API with service token'
+          HTTP_CODE=$(curl -sS -o /tmp/resp.json -w "%{http_code}" -X POST http://localhost:8000/api/v1/data/employees-for-matching -H "Authorization: Service ${SERVICE_AUTH_TOKEN}" -H "Content-Type: application/json" -d '{"algorithm_type":"cross_department"}' )
+          echo "HTTP code: $HTTP_CODE"
+          cat /tmp/resp.json || true
+          if [ "$HTTP_CODE" -ne 200 ]; then
+            echo 'Data API returned non-200';
+            exit 1;
+          fi
+
+      - name: Tear down docker-compose
+        if: always()
+        run: |
+          docker compose -f docker/docker-compose.yml down
