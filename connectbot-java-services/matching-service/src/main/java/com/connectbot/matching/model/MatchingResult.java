@@ -1,69 +1,66 @@
 package com.connectbot.matching.model;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
-import java.time.LocalDateTime;
 import java.util.List;
 
 /**
- * Результат алгоритма matching
- * 
- * @author ConnectBot Team
- * @version 1.0.0
+ * Минимальная модель результата matching.
  */
-@Data
-@NoArgsConstructor  
-@AllArgsConstructor
 public class MatchingResult {
-    
-    @JsonProperty("pairs")
     private List<EmployeePair> pairs;
-    
-    @JsonProperty("unmatched")
     private List<Employee> unmatched;
-    
-    @JsonProperty("algorithm")
     private String algorithm;
-    
-    @JsonProperty("total_employees")
-    private Integer totalEmployees;
-    
-    @JsonProperty("total_pairs")
-    private Integer totalPairs;
-    
-    @JsonProperty("success_rate")
-    private Double successRate;
-    
-    @JsonProperty("created_at")
-    private LocalDateTime createdAt;
-    
-    /**
-     * Конструктор с автоматическим расчетом статистики
-     */
+
+    public MatchingResult() {
+    }
+
     public MatchingResult(List<EmployeePair> pairs, List<Employee> unmatched, String algorithm) {
         this.pairs = pairs;
         this.unmatched = unmatched;
         this.algorithm = algorithm;
-        this.totalPairs = pairs != null ? pairs.size() : 0;
-        this.totalEmployees = (totalPairs * 2) + (unmatched != null ? unmatched.size() : 0);
-        this.successRate = totalEmployees > 0 ? (double)(totalPairs * 2) / totalEmployees * 100 : 0.0;
-        this.createdAt = LocalDateTime.now();
     }
-    
-    /**
-     * Проверка успешности matching
-     */
-    public boolean isSuccessful() {
-        return pairs != null && !pairs.isEmpty();
+
+    public List<EmployeePair> getPairs() {
+        return pairs;
     }
-    
-    /**
-     * Получение количества участников в парах
-     */
+
+    public void setPairs(List<EmployeePair> pairs) {
+        this.pairs = pairs;
+    }
+
+    public List<Employee> getUnmatched() {
+        return unmatched;
+    }
+
+    public void setUnmatched(List<Employee> unmatched) {
+        this.unmatched = unmatched;
+    }
+
+    public String getAlgorithm() {
+        return algorithm;
+    }
+
+    public void setAlgorithm(String algorithm) {
+        this.algorithm = algorithm;
+    }
+
+    public int getTotalPairs() {
+        return pairs != null ? pairs.size() : 0;
+    }
+
+    public double getSuccessRate() {
+        int total = (pairs != null ? pairs.size() * 2 : 0) + (unmatched != null ? unmatched.size() : 0);
+        if (total == 0)
+            return 0.0;
+        return (double) (pairs != null ? pairs.size() * 2 : 0) / total * 100.0;
+    }
+
+    // Количество сопоставленных сотрудников (в парах)
     public int getMatchedCount() {
-        return totalPairs * 2;
+        return pairs != null ? pairs.size() * 2 : 0;
+    }
+
+    // Успешность — признак того, что хотя бы одна пара создана
+    public boolean isSuccessful() {
+        return getMatchedCount() > 0;
     }
 }

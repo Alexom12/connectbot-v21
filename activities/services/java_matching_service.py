@@ -1,84 +1,76 @@
 import logging
-import aiohttp
+import asyncio
 import json
+import aiohttp
 from datetime import datetime
-from config.settings import JAVA_SERVICE_URL
+from config.settings import MATCHING_SERVICE_URL
 from activities.services.redis_service import activity_redis_service
+from bots.services.matching_service_client import MatchingServiceClient
 
 logger = logging.getLogger(__name__)
 
+
 class JavaMatchingService:
-    """Сервис для взаимодействия с Java микросервисом matching алгоритмов"""
-    
+    """Сервис-адаптер для взаимодействия с внешним Java matching-сервисом.
+    Использует синхронный `MatchingServiceClient` через `asyncio.to_thread`, чтобы
+    не блокировать event loop.
+    """
+
     def __init__(self):
-        self.base_url = JAVA_SERVICE_URL
+        # MATCHING_SERVICE_URL берется из настроек; тут поле оставлено для совместимости
+        self.base_url = MATCHING_SERVICE_URL
+        # Таймаут для aiohttp-вызовов в методах, использующих HTTP
         self.timeout = aiohttp.ClientTimeout(total=30)
-    
+
     async def match_coffee_pairs(self, participants):
         """
-        Формирование пар для Тайного кофе через Java микросервис
-        
+        Формирование пар для Тайного кофе через внешний Java-сервис.
+
         Args:
-            participants: список сотрудников для matching
-            
+            participants: список объектов Employee
+
         Returns:
             список пар [(employee1, employee2), ...]
         """
         try:
-            # Подготавливаем данные для отправки
-            participant_data = []
-            for employee in participants:
-                participant_data.append({
-                    'id': employee.id,
-                    'name': employee.name,
-                    'department': employee.department,
-                    'position': employee.position,
-                    'interests': [interest.name for interest in employee.interests.all()],
-                    'telegram_id': employee.telegram_id,
-                    'preferences': getattr(employee, 'preferences', {}),
-                })
-            
-            request_data = {
-                'participants': participant_data,
-                'algorithm': 'cross_department',
-                'optimization': 'high',
-                'activity_type': 'coffee'
-            }
-            
-            # Проверяем кэш
-            cache_key = f"matching_coffee_{hash(json.dumps(request_data, sort_keys=True))}"
+            if not participants:
+                return []
+
+            # Кэширование: формируем ключ по id участников
+            participant_ids = sorted([int(p.id) for p in participants])
+            cache_key = f"matching_coffee_{'_'.join(map(str, participant_ids))}"
             cached_result = await activity_redis_service.get_cached_activity_data(cache_key)
-            
             if cached_result:
                 logger.info("✅ Использованы кэшированные результаты matching")
                 return self._parse_matching_result(cached_result, participants)
-            
-            # Отправляем запрос к Java микросервису
-            async with aiohttp.ClientSession(timeout=self.timeout) as session:
-                url = f"{self.base_url}/api/matching/coffee/pairs"
-                
-                async with session.post(url, json=request_data) as response:
-                    if response.status == 200:
-                        result = await response.json()
-                        
-                        # Кэшируем результат на 1 час
-                        await activity_redis_service.cache_activity_data(
-                            cache_key, result, timeout=3600
-                        )
-                        
-                        pairs = self._parse_matching_result(result, participants)
-                        logger.info(f"✅ Java микросервис вернул {len(pairs)} пар")
-                        return pairs
-                    else:
-                        error_text = await response.text()
-                        logger.error(f"❌ Ошибка Java микросервиса: {response.status} - {error_text}")
-                        return self._fallback_matching(participants)
-                        
-        except aiohttp.ClientError as e:
-            logger.error(f"❌ Ошибка соединения с Java микросервисом: {e}")
-            return self._fallback_matching(participants)
+
+            # Вызываем синхронный клиент в пуле потоков
+            client = MatchingServiceClient()
+            pairs_data = await asyncio.to_thread(client.run_secret_coffee_matching, participants)
+
+            if not pairs_data:
+                logger.warning("Java-сервис вернул пустой ответ или был недоступен — используем fallback")
+                return self._fallback_matching(participants)
+
+            # Кэшируем результат
+            await activity_redis_service.cache_activity_data(cache_key, {"pairs": pairs_data}, timeout=3600)
+
+            # Сопоставляем id -> объекты Employee
+            participant_dict = {int(emp.id): emp for emp in participants}
+            pairs = []
+            for pair in pairs_data:
+                emp1_id = int(pair.get('employee1_id'))
+                emp2_id = int(pair.get('employee2_id'))
+                emp1 = participant_dict.get(emp1_id)
+                emp2 = participant_dict.get(emp2_id)
+                if emp1 and emp2:
+                    pairs.append((emp1, emp2))
+
+            logger.info(f"✅ Внешний matching вернул {len(pairs)} пар")
+            return pairs
+
         except Exception as e:
-            logger.error(f"❌ Неожиданная ошибка в matching: {e}")
+            logger.error(f"❌ Ошибка в адаптере JavaMatchingService.match_coffee_pairs: {e}")
             return self._fallback_matching(participants)
     
     async def match_tournament_bracket(self, participants, game_type="chess", format="swiss"):

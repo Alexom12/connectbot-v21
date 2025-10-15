@@ -1,0 +1,223 @@
+openapi: 3.0.3
+info:
+  title: ConnectBot Data API
+  version: '1.0'
+  description: |
+    Data API used by the Java Matching Service. Returns sanitized employee, interests and previous match data.
+
+servers:
+  - url: /api/v1/data
+
+paths:
+  /employees-for-matching:
+    post:
+      summary: Employees for matching
+      description: Returns a list of employees prepared for the matching algorithm. Excludes PII fields.
+      security:
+        - ServiceAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                algorithm_type:
+                  type: string
+                department_ids:
+                  type: array
+                  items:
+                    type: integer
+                business_center:
+                  type: string
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeesForMatchingResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /previous-matches:
+    post:
+      summary: Previous matches
+      description: Returns a list of previous SecretCoffeePairings used to avoid repeats.
+      security:
+        - ServiceAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                since_days:
+                  type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviousMatchesResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /employee-interests:
+    post:
+      summary: Employee interests
+      description: Returns mapping from employee id to list of interest objects.
+      security:
+        - ServiceAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                employee_ids:
+                  type: array
+                  items:
+                    type: integer
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EmployeeInterestsResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '500':
+          $ref: '#/components/responses/InternalError'
+
+  /health:
+    get:
+      summary: Health check
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                  service:
+                    type: string
+
+components:
+  securitySchemes:
+    ServiceAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: 'Service {TOKEN}'
+
+  responses:
+    Unauthorized:
+      description: Unauthorized - missing or invalid service token
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              error:
+                type: string
+
+  schemas:
+    Department:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        code:
+          type: string
+
+    Interest:
+      type: object
+      properties:
+        id:
+          type: integer
+        name:
+          type: string
+        category:
+          type: string
+
+    Employee:
+      type: object
+      properties:
+        id:
+          type: integer
+        full_name:
+          type: string
+        department:
+          $ref: '#/components/schemas/Department'
+        position:
+          type: string
+        business_center:
+          type: string
+        interests:
+          type: array
+          items:
+            $ref: '#/components/schemas/Interest'
+        is_active:
+          type: boolean
+
+    EmployeesForMatchingResponse:
+      type: object
+      properties:
+        employees:
+          type: array
+          items:
+            $ref: '#/components/schemas/Employee'
+        generated_at:
+          type: string
+          format: date-time
+
+    PreviousMatchItem:
+      type: object
+      properties:
+        employee_a:
+          $ref: '#/components/schemas/Employee'
+        employee_b:
+          $ref: '#/components/schemas/Employee'
+        matched_on:
+          type: string
+          format: date-time
+
+    PreviousMatchesResponse:
+      type: object
+      properties:
+        matches:
+          type: array
+          items:
+            $ref: '#/components/schemas/PreviousMatchItem'
+
+    EmployeeInterestsResponse:
+      type: object
+      properties:
+        interests:
+          type: object
+          additionalProperties:
+            type: array
+            items:
+              $ref: '#/components/schemas/Interest'

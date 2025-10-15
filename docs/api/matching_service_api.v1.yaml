@@ -1,0 +1,227 @@
+```yaml
+openapi: 3.0.3
+info:
+  title: "ConnectBot v21 - Matching Service API"
+  description: |
+    API для микросервиса подбора пар (Matching Service).
+    
+    **Назначение:**
+    - Принимает данные о сотрудниках и их предпочтениях от основного Django-приложения.
+    - Выполняет сложные алгоритмы для подбора пар (например, для "Тайного кофе").
+    - Возвращает результат подбора.
+    
+    **Принципы:**
+    - **Stateless:** Сервис не хранит состояние. Все необходимые данные передаются в запросе.
+    - **Изолированность:** Сервис не имеет прямого доступа к основной БД.
+    - **Синхронность:** Взаимодействие происходит по принципу "запрос-ответ".
+  version: "1.0.0"
+  contact:
+    name: "ConnectBot Development Team"
+    email: "dev@connectbot.com"
+
+servers:
+  - url: "http://localhost:8081/api/v1"
+    description: "Локальный сервер для разработки"
+  - url: "https://matching.connectbot.com/api/v1"
+    description: "Продуктивный сервер"
+
+tags:
+  - name: "Matching"
+    description: "Операции по подбору пар"
+  - name
+: "Health"
+    description: "Проверка состояния сервиса"
+
+paths:
+  /health:
+    get:
+      tags:
+        - "Health"
+      summary: "Проверка состояния сервиса"
+      description: "Возвращает статус работоспособности микросервиса."
+      operationId: "getHealthStatus"
+      responses:
+        '200':
+          description: "Сервис работает"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: "Сервис недоступен"
+
+  /match/secret-coffee:
+    post:
+      tags:
+        - "Matching"
+      summary: "Запуск подбора пар для 'Тайного кофе'"
+      description: |
+        Принимает список активных сотрудников и их предпочтения, 
+        выполняет алгоритм подбора и возвращает сформированные пары.
+      operationId: "createSecretCoffeeMatches"
+      requestBody:
+        required: true
+        description: "Данные для подбора пар"
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MatchingRequest'
+      responses:
+        '200':
+          description: "Успешный подбор пар"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MatchingResponse'
+        '400':
+          description: "Некорректные входные данные"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '500':
+          description: "Внутренняя ошибка сервера"
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  schemas:
+    # --- Основные модели ---
+
+    Employee:
+      type: "object"
+      description: "Модель сотрудника для подбора"
+      required:
+        - id
+        - department
+        - grade
+      properties:
+        id:
+          type: "integer"
+          format: "int64"
+          description: "Уникальный ID сотрудника из основной БД"
+          example: 101
+        department:
+          type: "string"
+          description: "Отдел сотрудника"
+          example: "Разработка"
+        grade:
+          type: "string"
+          enum: ["JUNIOR", "MIDDLE", "SENIOR", "LEAD"]
+          description: "Уровень (грейд) сотрудника"
+          example: "MIDDLE"
+        excluded_partners:
+          type: "array"
+          description: "Список ID сотрудников, с которыми уже были встречи"
+          items:
+            type: "integer"
+            format: "int64"
+          example: [102, 105]
+        preferences:
+          $ref: '#/components/schemas/EmployeePreferences'
+
+    EmployeePreferences:
+      type: "object"
+      description: "Предпочтения сотрудника"
+      properties:
+        preferred_format:
+          type: "string"
+          enum: ["ONLINE", "OFFLINE", "ANY"]
+          description: "Предпочтительный формат встречи"
+          example: "ANY"
+        topics_of_interest:
+          type: "array"
+          description: "Список интересных тем для разговора"
+          items:
+            type: "string"
+          example: ["Технологии", "Путешествия", "Спорт"]
+
+    # --- Модели запросов и ответов ---
+
+    MatchingRequest:
+      type: "object"
+      description: "Запрос на подбор пар"
+      required:
+        - employees
+      properties:
+        employees:
+          type: "array"
+          description: "Список сотрудников, участвующих в подборе"
+          items:
+            $ref: '#/components/schemas/Employee'
+        options:
+          type: "object"
+          properties:
+            match_across_departments:
+              type: "boolean"
+              description: "Разрешить ли подбор между разными отделами"
+              default: true
+            match_across_grades:
+              type: "boolean"
+              description: "Разрешить ли подбор между разными грейдами"
+              default: true
+
+    MatchingResponse:
+      type: "object"
+      description: "Результат подбора пар"
+      properties:
+        transaction_id:
+          type: "string"
+          format: "uuid"
+          description: "Уникальный ID операции подбора"
+          example: "a1b2c3d4-e5f6-7890-1234-567890abcdef"
+        pairs:
+          type: "array"
+          description: "Список сформированных пар"
+          items:
+            $ref: '#/components/schemas/EmployeePair'
+        unmatched_employees:
+          type: "array"
+          description: "Список ID сотрудников, которым не нашлась пара"
+          items:
+            type: "integer"
+            format: "int64"
+          example: [103]
+
+    EmployeePair:
+      type: "object"
+      description: "Сформированная пара сотрудников"
+      required:
+        - employee1_id
+        - employee2_id
+      properties:
+        employee1_id:
+          type: "integer"
+          format: "int64"
+          example: 101
+        employee2_id:
+          type: "integer"
+          format: "int64"
+          example: 104
+
+    # --- Вспомогательные модели ---
+
+    HealthStatus:
+      type: "object"
+      properties:
+        status:
+          type: "string"
+          example: "UP"
+
+    ErrorResponse:
+      type: "object"
+      properties:
+        timestamp:
+          type: "string"
+          format: "date-time"
+        status:
+          type: "integer"
+        error:
+          type: "string"
+        message:
+          type: "string"
+        path:
+          type: "string"
+```

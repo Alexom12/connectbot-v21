@@ -23,7 +23,7 @@ INSTALLED_APPS = [
     
     # Custom apps
     'employees',
-    'bots',
+    'bots.apps.BotsConfig',
     'activities',  # Добавлено новое приложение для активностей
 ]
 
@@ -67,6 +67,11 @@ REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
 
 # Java Service Configuration
 JAVA_SERVICE_URL = config('JAVA_SERVICE_URL', default='http://localhost:8080')
+MATCHING_SERVICE_URL = config('MATCHING_SERVICE_URL', default='http://localhost:8081')
+MATCHING_SERVICE_TIMEOUT = config('MATCHING_SERVICE_TIMEOUT', default=15, cast=int)
+
+# Secret token for /metrics/trigger endpoint (empty by default — disabled in prod)
+METRICS_TRIGGER_TOKEN = config('METRICS_TRIGGER_TOKEN', default='')
 
 # Cache Configuration with Redis
 CACHES = {
@@ -126,6 +131,9 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 # Telegram Bot Settings
 TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
 SUPER_ADMIN_ID = config('SUPER_ADMIN_ID', default=0, cast=int)
+
+# Service-to-service auth token for Data API
+SERVICE_AUTH_TOKEN = config('SERVICE_AUTH_TOKEN', default='')
 
 # Admin settings
 ADMIN_USERNAME = config('ADMIN_USERNAME', default='hr_admin')

@@ -1,66 +1,42 @@
 package com.connectbot.matching.model;
 
-import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-
 /**
- * Пара сотрудников для активности
- * 
- * @author ConnectBot Team
- * @version 1.0.0
+ * Минимальная модель пары сотрудников.
  */
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
 public class EmployeePair {
-    
-    @JsonProperty("employee1")
     private Employee employee1;
-    
-    @JsonProperty("employee2") 
     private Employee employee2;
-    
-    @JsonProperty("match_score")
-    private Double matchScore;
-    
-    /**
-     * Конструктор без match score
-     */
-    public EmployeePair(Employee employee1, Employee employee2) {
+
+    public EmployeePair() {
+    }
+
+    public EmployeePair(Employee e1, Employee e2) {
+        this.employee1 = e1;
+        this.employee2 = e2;
+    }
+
+    public Employee getEmployee1() {
+        return employee1;
+    }
+
+    public void setEmployee1(Employee employee1) {
         this.employee1 = employee1;
+    }
+
+    public Employee getEmployee2() {
+        return employee2;
+    }
+
+    public void setEmployee2(Employee employee2) {
         this.employee2 = employee2;
-        this.matchScore = 1.0; // По умолчанию
     }
-    
-    /**
-     * Проверка валидности пары
-     */
+
+    // Пара считается валидной, если оба сотрудника не null и имеют разные id
     public boolean isValid() {
-        return employee1 != null && employee2 != null && 
-               !employee1.getId().equals(employee2.getId());
-    }
-    
-    /**
-     * Получение отображаемого названия пары
-     */
-    public String getDisplayName() {
-        String name1 = employee1 != null ? employee1.getDisplayName() : "Unknown";
-        String name2 = employee2 != null ? employee2.getDisplayName() : "Unknown";
-        return name1 + " & " + name2;
-    }
-    
-    /**
-     * Проверка общих интересов
-     */
-    public boolean hasCommonInterests() {
-        if (employee1 == null || employee2 == null || 
-            !employee1.hasInterests() || !employee2.hasInterests()) {
+        if (employee1 == null || employee2 == null)
             return false;
-        }
-        
-        return employee1.getInterests().stream()
-            .anyMatch(interest -> employee2.getInterests().contains(interest));
+        if (employee1.getId() == null || employee2.getId() == null)
+            return false;
+        return !employee1.getId().equals(employee2.getId());
     }
 }

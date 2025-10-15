@@ -62,6 +62,31 @@ copy .env.example .env
 # Отредактируйте .env, добавьте свои данные
 ```
 
+#### Service-to-service token (SERVICE_AUTH_TOKEN)
+
+Data API защищён простым межсервисным токеном. Установите значение `SERVICE_AUTH_TOKEN` в вашем `.env` или в Docker Compose. Это значение должно совпадать и в Django, и в Java matching-service.
+
+Пример в `.env`:
+
+```ini
+SERVICE_AUTH_TOKEN=very_secure_random_value_here
+```
+
+Пример для `docker-compose.yml`:
+
+```yaml
+services:
+	matching-service:
+		environment:
+			- SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN}
+	web:
+		environment:
+			- SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN}
+```
+
+Не храните реальные токены в репозитории — используйте секретный менеджер или CI secrets.
+
+
 ### 5. Настройка Redis (опционально)
 ```bash
 # Запуск Redis через Docker Compose (если Docker установлен)
@@ -285,6 +310,40 @@ cd connectbot-java-services/matching-service
 - [ ] Containerization (Docker для всех сервисов)
 - [ ] CI/CD pipeline
 - [ ] Monitoring и логирование
+
+## 🚢 Локальная интеграция с Docker Compose
+
+В репозитории есть готовый `docker/docker-compose.yml`, который поднимает
+локально контейнеры для Django, Java matching-service, Redis и Prometheus.
+
+1. Скопируйте пример окружения и отредактируйте токен для локальной разработки:
+
+```powershell
+copy docker\.env.example docker\.env
+```
+
+2. Поднимите стек:
+
+```powershell
+docker compose -f docker/docker-compose.yml up --build
+```
+
+3. Откройте:
+- Django: http://localhost:8000
+- Java matching-service: http://localhost:8081
+- Prometheus UI: http://localhost:9090
+
+4. Чтобы остановить:
+
+```powershell
+docker compose -f docker/docker-compose.yml down
+```
+
+Файлы конфигурации:
+- `docker/Dockerfile` — образ для Django
+- `connectbot-java-services/matching-service/Dockerfile` — образ для Java
+- `docker/prometheus/prometheus.yml` — конфигурация Prometheus
+
 
 ## 🤝 Поддержка
 

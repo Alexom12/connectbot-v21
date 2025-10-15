@@ -1,0 +1,23 @@
+name: Check METRICS_TRIGGER_TOKEN
+
+on:
+  push:
+    branches:
+      - 'main'
+      - 'release/*'
+      - 'deploy/*'
+
+jobs:
+  check-token:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+
+      - name: Ensure METRICS_TRIGGER_TOKEN secret is present
+        run: |
+          if [ -z "${{ secrets.METRICS_TRIGGER_TOKEN }}" ]; then
+            echo "METRICS_TRIGGER_TOKEN secret is not set in this repository. Aborting.";
+            exit 1;
+          fi
+        shell: bash
