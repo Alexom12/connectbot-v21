@@ -6,7 +6,7 @@ Checks:
 - Prometheus metric values for requests/hits/misses
 - Attempts an external HTTP call to the running server to simulate Java container
 
-Run with: .\venv\Scripts\Activate.ps1; python tools/verify_data_api_integration.py
+Run with: .\venv\\\Scripts\Activate.ps1; python tools/verify_data_api_integration.py
 """
 import os
 import json
