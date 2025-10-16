@@ -32,7 +32,9 @@ public class MatchingControllerV1 {
     @GetMapping("/health")
     public ResponseEntity<HealthStatusDTO> healthCheck() {
         logger.info("V1 health check-запрос получен");
-        return ResponseEntity.ok(new HealthStatusDTO("OK"));
+        boolean healthy = matchingService.isHealthy();
+        HealthStatusDTO dto = new HealthStatusDTO(healthy ? "OK" : "DEGRADED");
+        return ResponseEntity.status(healthy ? 200 : 503).body(dto);
     }
 
     /**
@@ -51,14 +53,28 @@ public class MatchingControllerV1 {
         logger.info("V1 secret-coffee-запрос получен для {} сотрудников", request.getEmployees().size());
 
         try {
-            // Здесь будет вызов обновленного сервисного метода
-            // Пока что возвращаем заглушку
             MatchingResponseDTO response = matchingService.runSecretCoffee(request);
             logger.info("V1 secret-coffee-подбор выполнен, найдено {} пар.", response.getPairs().size());
             return ResponseEntity.ok(response);
+        } catch (RestClientException rce) {
+            logger.error("Data API error during matching: {}", rce.getMessage(), rce);
+            return ResponseEntity.status(502).build();
         } catch (Exception e) {
             logger.error("Ошибка в процессе V1 secret-coffee-подбора: {}", e.getMessage(), e);
-            // В будущем здесь будет более детальная обработка ошибок
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @PostMapping("/match/secret-coffee/from-api")
+    public ResponseEntity<MatchingResponseDTO> runSecretCoffeeFromApi(@RequestBody Map<String,Object> body) {
+        try {
+            MatchingResponseDTO response = matchingService.runSecretCoffeeFromApi(body);
+            return ResponseEntity.ok(response);
+        } catch (RestClientException rce) {
+            logger.error("Data API error during matching-from-api: {}", rce.getMessage(), rce);
+            return ResponseEntity.status(502).build();
+        } catch (Exception ex) {
+            logger.error("Unexpected error during matching-from-api: {}", ex.getMessage(), ex);
             return ResponseEntity.internalServerError().build();
         }
     }

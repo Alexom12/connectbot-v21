@@ -10,6 +10,9 @@ import org.springframework.stereotype.Service;
 import java.util.*;
 import java.util.stream.Collectors;
 import com.connectbot.matching.dto.EmployeeDTO;
+import com.connectbot.matching.client.DataApiClient;
+import com.connectbot.matching.dto.dataapi.DataApiEmployeesResponseDTO;
+import org.springframework.web.client.RestClientException;
 import com.connectbot.matching.dto.MatchingRequestDTO;
 import com.connectbot.matching.dto.EmployeePairDTO;
 import com.connectbot.matching.dto.MatchingResponseDTO;
@@ -31,6 +34,12 @@ public class MatchingService {
      * @param employees список сотрудников
      * @return результат matching с парами
      */
+    private final DataApiClient dataApiClient;
+
+    public MatchingService(DataApiClient dataApiClient) {
+        this.dataApiClient = dataApiClient;
+    }
+
     public MatchingResult simpleRandomMatching(List<Employee> employees) {
         logger.info("Запуск простого случайного matching для {} сотрудников", employees.size());
 
@@ -111,6 +120,30 @@ public class MatchingService {
         }
         response.setPairs(pairs);
         return response;
+    }
+
+    /**
+     * Run secret coffee matching by fetching employees from Data API using provided body parameters.
+     */
+    public MatchingResponseDTO runSecretCoffeeFromApi(java.util.Map<String,Object> body) {
+        try {
+            DataApiEmployeesResponseDTO resp = dataApiClient.getEmployeesForMatching(body);
+            MatchingRequestDTO request = new MatchingRequestDTO();
+            request.setEmployees(resp.getEmployees());
+            return runSecretCoffee(request);
+        } catch (RestClientException ex) {
+            logger.error("Failed to fetch employees from Data API: {}", ex.getMessage());
+            throw ex;
+        }
+    }
+
+    public boolean isHealthy() {
+        try {
+            return dataApiClient == null || dataApiClient.healthCheck();
+        } catch (Exception ex) {
+            logger.warn("MatchingService health check failed: {}", ex.getMessage());
+            return false;
+        }
     }
 
     /**
