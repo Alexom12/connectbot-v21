@@ -1,0 +1,23 @@
+server:
+  port: 8081
+
+spring:
+  application:
+    name: matching-service
+
+dataapi:
+  base-url: ${MATCHING_DATAAPI_URL:http://web:8000}
+  service-token: ${SERVICE_AUTH_TOKEN:}
+  retry:
+    attempts: ${DATAAPI_RETRY_ATTEMPTS:3}
+    backoff-ms: ${DATAAPI_RETRY_BACKOFF_MS:200}
+  request:
+    timeout-ms: ${DATAAPI_REQUEST_TIMEOUT_MS:5000}
+  connect:
+    timeout-ms: ${DATAAPI_CONNECT_TIMEOUT_MS:2000}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

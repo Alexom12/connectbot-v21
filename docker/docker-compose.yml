@@ -13,6 +13,8 @@ services:
       - "8081:8081"
     environment:
       - SPRING_DATASOURCE_URL=jdbc:h2:mem:testdb
+      - SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN}
+      - MATCHING_DATAAPI_URL=${MATCHING_DATAAPI_URL:http://web:8000}
 
   web:
     build:
@@ -27,6 +29,7 @@ services:
       - DEBUG=1
       - MATCHING_SERVICE_URL=http://matching-service:8081
       - REDIS_URL=redis://redis:6379/0
+      - SERVICE_AUTH_TOKEN=${SERVICE_AUTH_TOKEN}
       - METRICS_TRIGGER_TOKEN=${METRICS_TRIGGER_TOKEN}
     depends_on:
       - matching-service
