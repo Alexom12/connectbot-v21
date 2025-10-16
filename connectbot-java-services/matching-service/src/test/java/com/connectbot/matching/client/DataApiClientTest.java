@@ -55,7 +55,16 @@ public class DataApiClientTest {
                 .thenThrow(new RestClientException("fail1"));
 
         Map<String,Object> body = new HashMap<>();
-        assertThrows(RestClientException.class, () -> client.getEmployeesForMatching(body));
+        assertThrows(RuntimeException.class, () -> client.getEmployeesForMatching(body));
         verify(restTemplate, times(3)).exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST), ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class));
+    }
+
+    @Test
+    public void testNon2xxThrowsDataApiException() {
+        when(restTemplate.exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST), ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class)))
+                .thenReturn(ResponseEntity.status(500).body(null));
+
+        Map<String,Object> body = new HashMap<>();
+        assertThrows(RuntimeException.class, () -> client.getEmployeesForMatching(body));
     }
 }

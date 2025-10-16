@@ -55,19 +55,22 @@ public class DataApiClient {
             attempt++;
             try {
                 ResponseEntity<DataApiEmployeesResponseDTO> resp = restTemplate.exchange(url, HttpMethod.POST, entity, DataApiEmployeesResponseDTO.class);
+                if (!resp.getStatusCode().is2xxSuccessful()) {
+                    throw new DataApiException("Non-2xx response from Data API: " + resp.getStatusCodeValue(), resp.getStatusCodeValue());
+                }
                 return resp.getBody();
             } catch (RestClientException ex) {
                 logger.warn("DataApiClient attempt {} failed: {}", attempt, ex.getMessage());
                 if (attempt >= maxAttempts) {
-                    logger.error("DataApiClient exhausted retries, throwing");
-                    throw ex;
+                    logger.error("DataApiClient exhausted retries, throwing DataApiException");
+                    throw new DataApiException("Failed to call Data API after retries: " + ex.getMessage());
                 }
                 try {
                     long backoff = baseBackoffMs * (1L << (attempt-1));
                     Thread.sleep(backoff);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
-                    throw new RestClientException("Interrupted during backoff", ie);
+                    throw new DataApiException("Interrupted during backoff");
                 }
             }
         }
