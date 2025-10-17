@@ -38,6 +38,25 @@ services:
       - matching-service
       - redis
 
+  bot:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile
+    command: python manage.py runbot
+    volumes:
+      - ../:/app:delegated
+    environment:
+      DEBUG: "1"
+      MATCHING_SERVICE_URL: "http://matching-service:8081"
+      REDIS_URL: "redis://redis:6379/0"
+      SERVICE_AUTH_TOKEN: "${SERVICE_AUTH_TOKEN}"
+      METRICS_TRIGGER_TOKEN: "${METRICS_TRIGGER_TOKEN}"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
+    depends_on:
+      - web
+      - matching-service
+      - redis
+
   prometheus:
     image: prom/prometheus:latest
     volumes:
