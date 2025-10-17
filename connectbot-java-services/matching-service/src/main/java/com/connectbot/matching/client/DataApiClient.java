@@ -4,6 +4,8 @@ import com.connectbot.matching.dto.dataapi.DataApiEmployeesResponseDTO;
 import com.connectbot.matching.dto.MatchingRequestDTO;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -28,17 +30,20 @@ public class DataApiClient {
     private final String serviceToken;
     private final int maxAttempts;
     private final long baseBackoffMs;
+    private final ObjectMapper objectMapper;
 
     public DataApiClient(RestTemplate restTemplate,
-                         @Value("${dataapi.base-url:http://web:8000}") String baseUrl,
-                         @Value("${dataapi.service-token:}") String serviceToken,
-                         @Value("${dataapi.retry.attempts:3}") int maxAttempts,
-                         @Value("${dataapi.retry.backoff-ms:200}") long baseBackoffMs) {
+            ObjectMapper objectMapper,
+            @Value("${dataapi.base-url:http://web:8000}") String baseUrl,
+            @Value("${dataapi.service-token:}") String serviceToken,
+            @Value("${dataapi.retry.attempts:3}") int maxAttempts,
+            @Value("${dataapi.retry.backoff-ms:200}") long baseBackoffMs) {
         this.restTemplate = restTemplate;
-        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length()-1) : baseUrl;
+        this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
         this.serviceToken = serviceToken;
         this.maxAttempts = maxAttempts;
         this.baseBackoffMs = baseBackoffMs;
+        this.objectMapper = objectMapper;
     }
 
     public DataApiEmployeesResponseDTO getEmployeesForMatching(Map<String, Object> body) throws RestClientException {
@@ -48,15 +53,25 @@ public class DataApiClient {
         if (serviceToken != null && !serviceToken.isEmpty()) {
             headers.set("Authorization", "Service " + serviceToken);
         }
-        HttpEntity<Map<String,Object>> entity = new HttpEntity<>(body, headers);
+        String serialized = null;
+        try {
+            serialized = objectMapper.writeValueAsString(body);
+            logger.info("DataApiClient sending payload length={} chars: {}", serialized.length(), serialized.length() > 200 ? serialized.substring(0, 200) + "..." : serialized);
+        } catch (JsonProcessingException e) {
+            logger.warn("Failed to serialize Data API payload for logging: {}", e.getMessage());
+        }
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
         int attempt = 0;
         while (true) {
             attempt++;
             try {
-                ResponseEntity<DataApiEmployeesResponseDTO> resp = restTemplate.exchange(url, HttpMethod.POST, entity, DataApiEmployeesResponseDTO.class);
+                ResponseEntity<DataApiEmployeesResponseDTO> resp = restTemplate.exchange(url, HttpMethod.POST, entity,
+                        DataApiEmployeesResponseDTO.class);
                 if (!resp.getStatusCode().is2xxSuccessful()) {
-                    throw new DataApiException("Non-2xx response from Data API: " + resp.getStatusCodeValue(), resp.getStatusCodeValue());
+                    throw new DataApiException("Non-2xx response from Data API: " + resp.getStatusCodeValue(),
+                            resp.getStatusCodeValue());
                 }
                 return resp.getBody();
             } catch (RestClientException ex) {
@@ -66,7 +81,7 @@ public class DataApiClient {
                     throw new DataApiException("Failed to call Data API after retries: " + ex.getMessage());
                 }
                 try {
-                    long backoff = baseBackoffMs * (1L << (attempt-1));
+                    long backoff = baseBackoffMs * (1L << (attempt - 1));
                     Thread.sleep(backoff);
                 } catch (InterruptedException ie) {
                     Thread.currentThread().interrupt();
