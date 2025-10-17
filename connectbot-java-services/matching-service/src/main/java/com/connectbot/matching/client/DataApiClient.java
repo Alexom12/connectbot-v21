@@ -53,15 +53,17 @@ public class DataApiClient {
         if (serviceToken != null && !serviceToken.isEmpty()) {
             headers.set("Authorization", "Service " + serviceToken);
         }
-        String serialized = null;
+        String jsonBody;
         try {
-            serialized = objectMapper.writeValueAsString(body);
-            logger.info("DataApiClient sending payload length={} chars: {}", serialized.length(), serialized.length() > 200 ? serialized.substring(0, 200) + "..." : serialized);
+            jsonBody = objectMapper.writeValueAsString(body);
+            headers.setContentLength(jsonBody.length());
+            logger.info("DataApiClient sending payload length={} chars: {}", jsonBody.length(), jsonBody.length() > 200 ? jsonBody.substring(0, 200) + "..." : jsonBody);
         } catch (JsonProcessingException e) {
-            logger.warn("Failed to serialize Data API payload for logging: {}", e.getMessage());
+            logger.warn("Failed to serialize Data API payload: {}", e.getMessage());
+            throw new DataApiException("Failed to serialize request body");
         }
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
+        HttpEntity<String> entity = new HttpEntity<>(jsonBody, headers);
 
         int attempt = 0;
         while (true) {
