@@ -81,13 +81,13 @@ def employees_for_matching(request):
         # (e.g. "2") at the HTTP layer; log the raw bytes and some META fields
         raw_body = request.body if hasattr(request, 'body') else b''
         try:
-            logger.debug('Raw request.body bytes repr=%r', raw_body)
+            logger.info('Raw request.body bytes repr=%r', raw_body)
             # request.headers is available on Django HttpRequest for nicer view
             try:
-                logger.debug('Request headers: %s', dict(request.headers))
+                logger.info('Request headers: %s', dict(request.headers))
             except Exception:
-                logger.debug('Request headers unavailable')
-            logger.debug("Request META: CONTENT_LENGTH=%s, HTTP_TRANSFER_ENCODING=%s, REQUEST_METHOD=%s, HTTP_HOST=%s",
+                logger.info('Request headers unavailable')
+            logger.info("Request META: CONTENT_LENGTH=%s, HTTP_TRANSFER_ENCODING=%s, REQUEST_METHOD=%s, HTTP_HOST=%s",
                          request.META.get('CONTENT_LENGTH'), request.META.get('HTTP_TRANSFER_ENCODING'),
                          request.method, request.META.get('HTTP_HOST'))
         except Exception:
