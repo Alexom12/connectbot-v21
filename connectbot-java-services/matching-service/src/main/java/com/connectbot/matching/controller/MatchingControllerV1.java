@@ -6,6 +6,8 @@ import com.connectbot.matching.dto.MatchingResponseDTO;
 import com.connectbot.matching.service.MatchingService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.web.client.RestClientException;
+import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -66,7 +68,7 @@ public class MatchingControllerV1 {
     }
 
     @PostMapping("/match/secret-coffee/from-api")
-    public ResponseEntity<MatchingResponseDTO> runSecretCoffeeFromApi(@RequestBody Map<String,Object> body) {
+    public ResponseEntity<MatchingResponseDTO> runSecretCoffeeFromApi(@RequestBody Map<String, Object> body) {
         try {
             MatchingResponseDTO response = matchingService.runSecretCoffeeFromApi(body);
             return ResponseEntity.ok(response);
