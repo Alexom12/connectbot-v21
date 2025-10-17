@@ -12,7 +12,7 @@ COPY mvnw ./
 # Download dependencies and build
 RUN chmod +x mvnw \
     && MAVEN_CONFIG= ./mvnw dependency:go-offline -B
-RUN mvn -B -q -DskipTests package
+RUN mvn -B -q -DskipTests -Dmaven.test.skip=true package
 
 # Stage 2: runtime image with minimal JRE
 FROM eclipse-temurin:21-jre
