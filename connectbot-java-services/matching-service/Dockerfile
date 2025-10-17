@@ -11,7 +11,7 @@ COPY mvnw ./
 
 # Download dependencies and build
 RUN chmod +x mvnw \
-    && ./mvnw dependency:go-offline -B
+    && MAVEN_CONFIG= ./mvnw dependency:go-offline -B
 RUN mvn -B -q -DskipTests package
 
 # Stage 2: runtime image with minimal JRE
