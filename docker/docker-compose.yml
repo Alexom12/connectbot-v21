@@ -33,6 +33,7 @@ services:
       REDIS_URL: "redis://redis:6379/0"
       SERVICE_AUTH_TOKEN: "${SERVICE_AUTH_TOKEN}"
       METRICS_TRIGGER_TOKEN: "${METRICS_TRIGGER_TOKEN}"
+      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
     depends_on:
       - matching-service
       - redis
