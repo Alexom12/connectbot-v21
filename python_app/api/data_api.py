@@ -77,7 +77,23 @@ def employees_for_matching(request):
         return JsonResponse({'error': 'unauthorized'}, status=401)
 
     try:
-        body = json.loads(request.body.decode('utf-8') or '{}')
+        # capture raw bytes for debugging — sometimes the server logs a stray character
+        # (e.g. "2") at the HTTP layer; log the raw bytes and some META fields
+        raw_body = request.body if hasattr(request, 'body') else b''
+        try:
+            logger.debug('Raw request.body bytes repr=%r', raw_body)
+            # request.headers is available on Django HttpRequest for nicer view
+            try:
+                logger.debug('Request headers: %s', dict(request.headers))
+            except Exception:
+                logger.debug('Request headers unavailable')
+            logger.debug("Request META: CONTENT_LENGTH=%s, HTTP_TRANSFER_ENCODING=%s, REQUEST_METHOD=%s, HTTP_HOST=%s",
+                         request.META.get('CONTENT_LENGTH'), request.META.get('HTTP_TRANSFER_ENCODING'),
+                         request.method, request.META.get('HTTP_HOST'))
+        except Exception:
+            logger.exception('Failed to log raw request debug info')
+
+        body = json.loads(raw_body.decode('utf-8') or '{}')
     except Exception:
         body = {}
 
