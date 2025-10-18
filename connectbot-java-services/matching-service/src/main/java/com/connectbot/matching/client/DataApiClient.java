@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpMethod;
@@ -32,6 +33,7 @@ public class DataApiClient {
     private final long baseBackoffMs;
     private final ObjectMapper objectMapper;
 
+    @Autowired
     public DataApiClient(RestTemplate restTemplate,
             ObjectMapper objectMapper,
             @Value("${dataapi.base-url:http://web:8000}") String baseUrl,
