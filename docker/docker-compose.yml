@@ -18,8 +18,7 @@ services:
       SPRING_DATASOURCE_URL: "jdbc:h2:mem:testdb"
       # These values will be read from ../.env (if present)
       SERVICE_AUTH_TOKEN: "${SERVICE_AUTH_TOKEN}"
-      MATCHING_DATAAPI_URL: "${MATCHING_DATAAPI_URL:-http://web:8000}"
-      DATAAPI_BASE_URL: "${MATCHING_DATAAPI_URL:-http://web:8000}"
+      DATAAPI_BASE_URL: "${DATAAPI_BASE_URL:-http://web:8000}"
       DATAAPI_SERVICE_TOKEN: "${SERVICE_AUTH_TOKEN}"
 
   web:
