@@ -6,6 +6,7 @@ import com.connectbot.matching.model.MatchingResult;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
+import org.springframework.beans.factory.annotation.Autowired;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -36,15 +37,9 @@ public class MatchingService {
      */
     private final DataApiClient dataApiClient;
 
+    @Autowired
     public MatchingService(DataApiClient dataApiClient) {
         this.dataApiClient = dataApiClient;
-    }
-
-    /**
-     * No-arg constructor for tests and frameworks that require it.
-     */
-    public MatchingService() {
-        this.dataApiClient = null;
     }
 
     public MatchingResult simpleRandomMatching(List<Employee> employees) {
