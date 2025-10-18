@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  matching-service:
+    image: alexom12/connectbot-matching:latest
+    ports:
+      - "8081:8081"
+    secrets:
+      - service_auth_token
+    environment:
+      DATAAPI_SERVICE_TOKEN_FILE: /run/secrets/service_auth_token
+
+  web:
+    image: alexom12/connectbot-web:latest
+    ports:
+      - "8000:8000"
+    secrets:
+      - django_secret_key
+      - service_auth_token
+    environment:
+      DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
+      SERVICE_AUTH_TOKEN_FILE: /run/secrets/service_auth_token
+
+secrets:
+  service_auth_token:
+    external: true
+  django_secret_key:
+    external: true
+  telegram_bot_token:
+    external: true
