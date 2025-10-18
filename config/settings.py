@@ -133,7 +133,27 @@ TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
 SUPER_ADMIN_ID = config('SUPER_ADMIN_ID', default=0, cast=int)
 
 # Service-to-service auth token for Data API
-SERVICE_AUTH_TOKEN = config('SERVICE_AUTH_TOKEN', default='')
+def _read_secret_file(path):
+    try:
+        if os.path.exists(path):
+            with open(path, 'r', encoding='utf-8') as f:
+                return f.read().strip()
+    except Exception:
+        pass
+    return None
+
+# Try to load SECRET_KEY and SERVICE_AUTH_TOKEN from Docker secrets if available
+secret_key_from_file = _read_secret_file('/run/secrets/django_secret_key')
+if secret_key_from_file:
+    SECRET_KEY = secret_key_from_file
+else:
+    SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
+
+service_token_from_file = _read_secret_file('/run/secrets/service_auth_token')
+if service_token_from_file:
+    SERVICE_AUTH_TOKEN = service_token_from_file
+else:
+    SERVICE_AUTH_TOKEN = config('SERVICE_AUTH_TOKEN', default='')
 
 # Admin settings
 ADMIN_USERNAME = config('ADMIN_USERNAME', default='hr_admin')

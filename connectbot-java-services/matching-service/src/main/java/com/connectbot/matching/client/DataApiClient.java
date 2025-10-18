@@ -20,6 +20,10 @@ import org.springframework.web.client.RestTemplate;
 import java.time.Duration;
 import java.util.HashMap;
 import java.util.Map;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+import java.nio.charset.StandardCharsets;
 
 @Component
 public class DataApiClient {
@@ -42,7 +46,21 @@ public class DataApiClient {
             @Value("${dataapi.retry.backoff-ms:200}") long baseBackoffMs) {
         this.restTemplate = restTemplate;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        this.serviceToken = serviceToken;
+        // If serviceToken is empty, attempt to read from a secrets file (Docker secrets)
+        String token = serviceToken;
+        if (token == null || token.isEmpty()) {
+            String tokenFile = System.getenv().getOrDefault("DATAAPI_SERVICE_TOKEN_FILE", "/run/secrets/service_auth_token");
+            try {
+                if (Files.exists(Paths.get(tokenFile))) {
+                    byte[] bytes = Files.readAllBytes(Paths.get(tokenFile));
+                    token = new String(bytes, StandardCharsets.UTF_8).trim();
+                    logger.info("Loaded Data API service token from file {}", tokenFile);
+                }
+            } catch (IOException e) {
+                logger.debug("Service token file not available at {}: {}", tokenFile, e.getMessage());
+            }
+        }
+        this.serviceToken = token;
         this.maxAttempts = maxAttempts;
         this.baseBackoffMs = baseBackoffMs;
         this.objectMapper = objectMapper;
