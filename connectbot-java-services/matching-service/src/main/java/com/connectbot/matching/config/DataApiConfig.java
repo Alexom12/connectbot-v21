@@ -22,27 +22,27 @@ public class DataApiConfig {
 
     @Bean
     public RestTemplate dataApiRestTemplate(
-        @Value("${dataapi.request.timeout-ms:5000}") long timeoutMs,
-        @Value("${dataapi.connect.timeout-ms:2000}") long connectMs) {
-    logger.info("Configuring Data API RestTemplate with connectTimeout={}ms requestTimeout={}ms", connectMs,
-        timeoutMs);
+            @Value("${dataapi.request.timeout-ms:5000}") long timeoutMs,
+            @Value("${dataapi.connect.timeout-ms:2000}") long connectMs) {
+        logger.info("Configuring Data API RestTemplate with connectTimeout={}ms requestTimeout={}ms", connectMs,
+                timeoutMs);
 
-    // Build an Apache HttpClient5 instance with explicit timeouts configured
-    // so we can control connect/response timeouts without relying on
-    // RestTemplateBuilder's reflective configuration which expects
-    // different setter methods on the factory.
-    RequestConfig requestConfig = RequestConfig.custom()
-        .setConnectTimeout(Timeout.ofMilliseconds(connectMs))
-        .setResponseTimeout(Timeout.ofMilliseconds(timeoutMs))
-        .build();
+        // Build an Apache HttpClient5 instance with explicit timeouts configured
+        // so we can control connect/response timeouts without relying on
+        // RestTemplateBuilder's reflective configuration which expects
+        // different setter methods on the factory.
+        RequestConfig requestConfig = RequestConfig.custom()
+                .setConnectTimeout(Timeout.ofMilliseconds(connectMs))
+                .setResponseTimeout(Timeout.ofMilliseconds(timeoutMs))
+                .build();
 
-    CloseableHttpClient httpClient = HttpClients.custom()
-        .setDefaultRequestConfig(requestConfig)
-        .build();
+        CloseableHttpClient httpClient = HttpClients.custom()
+                .setDefaultRequestConfig(requestConfig)
+                .build();
 
-    HttpComponentsClientHttpRequestFactory f = new HttpComponentsClientHttpRequestFactory(httpClient);
-    f.setBufferRequestBody(true);
+        HttpComponentsClientHttpRequestFactory f = new HttpComponentsClientHttpRequestFactory(httpClient);
+        f.setBufferRequestBody(true);
 
-    return new RestTemplate(f);
+        return new RestTemplate(f);
     }
 }

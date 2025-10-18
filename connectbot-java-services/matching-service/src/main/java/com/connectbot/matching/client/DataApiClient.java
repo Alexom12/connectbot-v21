@@ -46,6 +46,17 @@ public class DataApiClient {
         this.objectMapper = objectMapper;
     }
 
+    /**
+     * Compatibility constructor used by tests when an ObjectMapper bean is not provided.
+     */
+    public DataApiClient(RestTemplate restTemplate,
+                         String baseUrl,
+                         String serviceToken,
+                         int maxAttempts,
+                         int baseBackoffMs) {
+        this(restTemplate, new ObjectMapper(), baseUrl, serviceToken, maxAttempts, (long) baseBackoffMs);
+    }
+
     public DataApiEmployeesResponseDTO getEmployeesForMatching(Map<String, Object> body) throws RestClientException {
         String url = baseUrl + "/api/v1/data/employees-for-matching";
         HttpHeaders headers = new HttpHeaders();
@@ -57,7 +68,8 @@ public class DataApiClient {
         try {
             jsonBody = objectMapper.writeValueAsString(body);
             headers.setContentLength(jsonBody.length());
-            logger.info("DataApiClient sending payload length={} chars: {}", jsonBody.length(), jsonBody.length() > 200 ? jsonBody.substring(0, 200) + "..." : jsonBody);
+            logger.info("DataApiClient sending payload length={} chars: {}", jsonBody.length(),
+                    jsonBody.length() > 200 ? jsonBody.substring(0, 200) + "..." : jsonBody);
         } catch (JsonProcessingException e) {
             logger.warn("Failed to serialize Data API payload: {}", e.getMessage());
             throw new DataApiException("Failed to serialize request body");

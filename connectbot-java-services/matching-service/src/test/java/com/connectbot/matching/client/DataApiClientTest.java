@@ -38,33 +38,38 @@ public class DataApiClientTest {
         DataApiEmployeesResponseDTO dto = new DataApiEmployeesResponseDTO();
         dto.setEmployees(Collections.singletonList(new EmployeeDTO()));
 
-        when(restTemplate.exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST), ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class)))
+        when(restTemplate.exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST),
+                ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class)))
                 .thenThrow(new RestClientException("temporary"))
                 .thenReturn(ResponseEntity.ok(dto));
 
-        Map<String,Object> body = new HashMap<>();
+        Map<String, Object> body = new HashMap<>();
         DataApiEmployeesResponseDTO res = client.getEmployeesForMatching(body);
         assertNotNull(res);
         assertNotNull(res.getEmployees());
-        verify(restTemplate, atLeast(2)).exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST), ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class));
+        verify(restTemplate, atLeast(2)).exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST),
+                ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class));
     }
 
     @Test
     public void testExhaustRetries() {
-        when(restTemplate.exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST), ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class)))
+        when(restTemplate.exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST),
+                ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class)))
                 .thenThrow(new RestClientException("fail1"));
 
-        Map<String,Object> body = new HashMap<>();
+        Map<String, Object> body = new HashMap<>();
         assertThrows(RuntimeException.class, () -> client.getEmployeesForMatching(body));
-        verify(restTemplate, times(3)).exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST), ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class));
+        verify(restTemplate, times(3)).exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST),
+                ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class));
     }
 
     @Test
     public void testNon2xxThrowsDataApiException() {
-        when(restTemplate.exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST), ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class)))
+        when(restTemplate.exchange(ArgumentMatchers.anyString(), ArgumentMatchers.eq(HttpMethod.POST),
+                ArgumentMatchers.any(), ArgumentMatchers.eq(DataApiEmployeesResponseDTO.class)))
                 .thenReturn(ResponseEntity.status(500).body(null));
 
-        Map<String,Object> body = new HashMap<>();
+        Map<String, Object> body = new HashMap<>();
         assertThrows(RuntimeException.class, () -> client.getEmployeesForMatching(body));
     }
 }

@@ -40,6 +40,13 @@ public class MatchingService {
         this.dataApiClient = dataApiClient;
     }
 
+    /**
+     * No-arg constructor for tests and frameworks that require it.
+     */
+    public MatchingService() {
+        this.dataApiClient = null;
+    }
+
     public MatchingResult simpleRandomMatching(List<Employee> employees) {
         logger.info("Запуск простого случайного matching для {} сотрудников", employees.size());
 
@@ -123,9 +130,10 @@ public class MatchingService {
     }
 
     /**
-     * Run secret coffee matching by fetching employees from Data API using provided body parameters.
+     * Run secret coffee matching by fetching employees from Data API using provided
+     * body parameters.
      */
-    public MatchingResponseDTO runSecretCoffeeFromApi(java.util.Map<String,Object> body) {
+    public MatchingResponseDTO runSecretCoffeeFromApi(java.util.Map<String, Object> body) {
         try {
             DataApiEmployeesResponseDTO resp = dataApiClient.getEmployeesForMatching(body);
             MatchingRequestDTO request = new MatchingRequestDTO();
