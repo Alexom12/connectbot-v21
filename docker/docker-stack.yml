@@ -17,9 +17,6 @@ services:
     secrets:
       - django_secret_key
       - service_auth_token
-    secrets:
-      - django_secret_key
-      - service_auth_token
     environment:
       DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
       SERVICE_AUTH_TOKEN_FILE: /run/secrets/service_auth_token
