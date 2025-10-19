@@ -63,7 +63,7 @@ DATABASES = {
 }
 
 # Redis Configuration
-REDIS_URL = config('REDIS_URL', default='redis://localhost:6379/0')
+REDIS_URL = config('REDIS_URL', default='redis://redis:6379/0')
 
 # Java Service Configuration
 JAVA_SERVICE_URL = config('JAVA_SERVICE_URL', default='http://localhost:8080')
