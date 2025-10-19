@@ -14,7 +14,7 @@ COPY requirements.txt /app/
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # copy project
-COPY ./docker/web-entrypoint.sh /app/web-entrypoint.sh
+COPY ./docker/web-entrypoint-debug.sh /app/web-entrypoint.sh
 RUN chmod +x /app/web-entrypoint.sh
 
 ENTRYPOINT ["/app/web-entrypoint.sh"]
