@@ -6,20 +6,21 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.jobstores.base import JobLookupError
 
 from django.utils import timezone
-from activities.services import feedback_service
+from activities.feedback_services import FeedbackService
 from bots.bot_instance import get_bot_instance
 
 logger = logging.getLogger(__name__)
 
 scheduler = AsyncIOScheduler(timezone="UTC")
+feedback_service = FeedbackService()
 
 
 async def send_feedback_request(meeting_id: int):
     """
     Отправляет участникам встречи запрос на оставление отзыва.
     """
-    bot = get_bot_instance()
-    if not bot:
+    app = get_bot_instance()
+    if not app or not app.bot:
         logger.error("Не удалось получить экземпляр бота для отправки запроса на отзыв.")
         return
 
@@ -33,7 +34,7 @@ async def send_feedback_request(meeting_id: int):
 
         for user_id in participant_ids:
             try:
-                await bot.send_message(
+                await app.bot.send_message(
                     chat_id=user_id,
                     text="Привет! Недавно у вас состоялась встреча в рамках Secret Coffee. "
                          "Пожалуйста, уделите минуту, чтобы оставить отзыв. "

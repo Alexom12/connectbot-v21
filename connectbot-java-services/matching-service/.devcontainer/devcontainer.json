@@ -1,27 +1,29 @@
 {
-	"name": "Java",
-	"image": "mcr.microsoft.com/vscode/devcontainers/java:21",
-	"features": {
-		"ghcr.io/devcontainers/features/java:1": {
-			"version": "21",
-			"installMaven": "true"
-		}
-	},
-	"customizations": {
-		"vscode": {
-			"extensions": [
-				"vscjava.vscode-java-pack",
-				"redhat.java",
-				"vscjava.vscode-maven",
-				"vscjava.vscode-java-debug",
-				"vscjava.vscode-java-test",
-				"vscjava.vscode-spring-boot-dashboard",
-				"vmware.vscode-spring-boot",
-				"ms-azuretools.vscode-docker"
-			]
-		}
-	},
-	"forwardPorts": [8080],
-	"postCreateCommand": "echo 'Dev container is ready!'",
-	"remoteUser": "vscode"
+    "name": "Java",
+    "image": "mcr.microsoft.com/vscode/devcontainers/java:21",
+    "features": {
+        "ghcr.io/devcontainers/features/java:1": {
+            "version": "21",
+            "installMaven": "true"
+        }
+    },
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "vscjava.vscode-java-pack",
+                "redhat.java",
+                "vscjava.vscode-maven",
+                "vscjava.vscode-java-debug",
+                "vscjava.vscode-java-test",
+                "vscjava.vscode-spring-boot-dashboard",
+                "vmware.vscode-spring-boot",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    },
+    "forwardPorts": [
+        8080
+    ],
+    "postCreateCommand": "echo 'Dev container is ready!'",
+    "remoteUser": "vscode"
 }

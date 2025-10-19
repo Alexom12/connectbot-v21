@@ -1,65 +1,37 @@
+# bots/bot_instance.py
 import logging
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler
+from telegram.ext import Application
 from config.settings import TELEGRAM_BOT_TOKEN
-from bots.handlers import (
-    start_handlers,
-    menu_handlers, 
-    secret_coffee_handlers,
-    notification_handlers
-)
 
 logger = logging.getLogger(__name__)
 
-def setup_handlers(application):
-    """Настройка всех обработчиков бота"""
-    
-    # Базовые обработчики
-    start_handlers.setup_start_handlers(application)
-    menu_handlers.setup_menu_handlers(application)
-    
-    # Обработчики Тайного кофе
-    secret_coffee_handlers.setup_secret_coffee_handlers(application)
-    
-    # Обработчики уведомлений
-    notification_handlers.setup_notification_handlers(application)
-    
-    # Обработчик ошибок
-    application.add_error_handler(error_handler)
+_application_instance = None
 
-async def error_handler(update, context):
-    """Обработчик ошибок"""
-    logger.error(f"Ошибка в боте: {context.error}", exc_info=context.error)
+def get_bot_instance() -> Application:
+    """Возвращает синглтон-экземпляр Application."""
+    global _application_instance
+    if _application_instance is None:
+        _application_instance = create_bot_application()
+    return _application_instance
+
+def set_bot_instance(application: Application):
+    """Устанавливает глобальный экземпляр Application."""
+    global _application_instance
+    _application_instance = application
 
 def create_bot_application():
     """Создание и настройка приложения бота"""
+    if not TELEGRAM_BOT_TOKEN:
+        logger.error("TELEGRAM_BOT_TOKEN не найден!")
+        raise ValueError("Не установлен токен для Telegram бота.")
+        
     try:
         application = Application.builder().token(TELEGRAM_BOT_TOKEN).build()
-        setup_handlers(application)
-        logger.info("✅ Бот успешно инициализирован")
+        logger.info("✅ Экземпляр бота успешно создан")
         return application
     except Exception as e:
-        logger.error(f"❌ Ошибка создания бота: {e}")
-        return None
+        logger.error(f"❌ Ошибка создания экземпляра бота: {e}")
+        raise e
 
-# Глобальная переменная для доступа к приложению
-application = create_bot_application()
-from bots.handlers import preference_handlers
-
-def setup_handlers(application):
-    """Настройка всех обработчиков бота"""
-    
-    # Базовые обработчики
-    start_handlers.setup_start_handlers(application)
-    menu_handlers.setup_menu_handlers(application)
-    
-    # Обработчики предпочтений
-    preference_handlers.setup_preference_handlers(application)
-    
-    # Обработчики Тайного кофе
-    secret_coffee_handlers.setup_secret_coffee_handlers(application)
-    
-    # Обработчики уведомлений
-    notification_handlers.setup_notification_handlers(application)
-    
-    # Обработчик ошибок
-    application.add_error_handler(error_handler)
+# Этот файл больше не должен содержать логику настройки обработчиков.
+# Логика перенесена в runbot_fixed_main.py

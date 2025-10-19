@@ -135,8 +135,10 @@ public class DataApiClient {
     }
 
     private static String maskToken(String s) {
-        if (s == null || s.isEmpty()) return "<empty>";
-        if (s.length() <= 8) return s + " len=" + s.length();
+        if (s == null || s.isEmpty())
+            return "<empty>";
+        if (s.length() <= 8)
+            return s + " len=" + s.length();
         return s.substring(0, 8) + "...";
     }
 

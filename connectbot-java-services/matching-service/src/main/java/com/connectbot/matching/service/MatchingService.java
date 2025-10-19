@@ -43,7 +43,8 @@ public class MatchingService {
     }
 
     public MatchingResult simpleRandomMatching(List<Employee> employees) {
-        logger.info("🔥 HOT-RELOAD TEST: v2 🔥 Запуск простого случайного matching для {} сотрудников", employees.size());
+        logger.info("🔥 HOT-RELOAD TEST: v2 🔥 Запуск простого случайного matching для {} сотрудников",
+                employees.size());
 
         // Валидация входных данных
         if (employees == null || employees.isEmpty()) {
