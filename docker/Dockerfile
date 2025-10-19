@@ -19,3 +19,7 @@ COPY . /app
 EXPOSE 8000
 
 # default command is handled by docker-compose to run migrations and server
+
+# Ensure container runs the Django development server when deployed as an image
+# so the service does not immediately exit after running one-off commands.
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
