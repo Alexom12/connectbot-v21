@@ -11,7 +11,17 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = ['localhost', '127.0.0.1', '0.0.0.0', 'web', 'matching-service', '195.133.50.206']
+ALLOWED_HOSTS = []
+
+# Telegram Bot Token
+try:
+    with open('telegram_token.txt', 'r') as f:
+        TELEGRAM_TOKEN = f.read().strip()
+except FileNotFoundError:
+    TELEGRAM_TOKEN = None
+
+
+# Application definition
 
 INSTALLED_APPS = [
     'django.contrib.admin',
@@ -21,6 +31,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     
+    # Third-party apps
+    'django_apscheduler',
+
     # Custom apps
     'employees',
     'bots.apps.BotsConfig',
@@ -66,9 +79,9 @@ DATABASES = {
 REDIS_URL = config('REDIS_URL', default='redis://redis:6379/0')
 
 # Java Service Configuration
-JAVA_SERVICE_URL = config('JAVA_SERVICE_URL', default='http://localhost:8080')
-MATCHING_SERVICE_URL = config('MATCHING_SERVICE_URL', default='http://localhost:8081')
+MATCHING_SERVICE_URL = config('MATCHING_SERVICE_URL_INTERNAL', default='http://localhost:8080')
 MATCHING_SERVICE_TIMEOUT = config('MATCHING_SERVICE_TIMEOUT', default=15, cast=int)
+
 
 # Secret token for /metrics/trigger endpoint (empty by default — disabled in prod)
 METRICS_TRIGGER_TOKEN = config('METRICS_TRIGGER_TOKEN', default='')

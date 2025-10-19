@@ -1,5 +1,8 @@
 from django.db import models
 from employees.models import Employee
+from django.core.validators import MinValueValidator, MaxValueValidator
+from django.utils import timezone
+from asgiref.sync import sync_to_async
 
 # Типы активностей
 ACTIVITY_TYPES = [
@@ -105,6 +108,11 @@ class SecretCoffeeMeeting(models.Model):
     emergency_stopped = models.BooleanField(default=False)
     moderator_notified = models.BooleanField(default=False)
     
+    # Поля для системы отзывов
+    feedback_collected = models.BooleanField("Сбор отзывов завершен", default=False)
+    average_rating = models.FloatField("Средний рейтинг", null=True, blank=True)
+    feedback_deadline = models.DateTimeField("Дедлайн для отзывов", null=True, blank=True)
+    
     created_at = models.DateTimeField(auto_now_add=True)
     updated_at = models.DateTimeField(auto_now=True)
     
@@ -115,6 +123,39 @@ class SecretCoffeeMeeting(models.Model):
             models.Index(fields=['status']),
             models.Index(fields=['meeting_date']),
         ]
+
+    @sync_to_async
+    def get_partner(self, current_user_telegram_id: int):
+        """Возвращает партнера по встрече."""
+        if self.employee1.telegram_id == current_user_telegram_id:
+            return self.employee2
+        elif self.employee2.telegram_id == current_user_telegram_id:
+            return self.employee1
+        return None
+
+    # Оборачиваем синхронный метод get_partner в асинхронную версию
+    aget_partner = get_partner
+
+    def mark_feedback_collected(self):
+        """Отметить, что сбор отзывов по этой встрече завершен."""
+        self.feedback_collected = True
+        self.save(update_fields=['feedback_collected'])
+
+    def calculate_average_rating(self):
+        """Рассчитать и сохранить средний рейтинг по всем отзывам."""
+        avg_rating = self.feedbacks.aggregate(models.Avg('rating'))['rating__avg']
+        if avg_rating is not None:
+            self.average_rating = round(avg_rating, 2)
+            self.save(update_fields=['average_rating'])
+        return self.average_rating
+
+    def get_feedback_status(self):
+        """Получить статус сбора отзывов (например, 'pending', 'completed', 'overdue')."""
+        if self.feedback_collected:
+            return 'completed'
+        if self.feedback_deadline and timezone.now() > self.feedback_deadline:
+            return 'overdue'
+        return 'pending'
 
 class SecretCoffeePreference(models.Model):
     """Предпочтения сотрудника для Тайного кофе"""
@@ -191,3 +232,59 @@ class SecretCoffeeProposal(models.Model):
     
     class Meta:
         db_table = 'secret_coffee_proposals'
+
+class MeetingFeedback(models.Model):
+    """Модель для сбора отзывов о встречах"""
+    
+    FEEDBACK_TYPES = [
+        ('coffee', 'Тайный кофе'),
+        ('chess', 'Шахматы'),
+        ('pingpong', 'Настольный теннис'),
+        ('workshop', 'Мастер-класс'),
+        ('photo_quest', 'Фотоквест'),
+    ]
+
+    meeting = models.ForeignKey(
+        SecretCoffeeMeeting, 
+        on_delete=models.CASCADE, 
+        related_name='feedbacks',
+        verbose_name='Встреча'
+    )
+    employee = models.ForeignKey(
+        Employee, 
+        on_delete=models.CASCADE, 
+        related_name='given_feedbacks',
+        verbose_name='Сотрудник'
+    )
+    rating = models.IntegerField(
+        "Рейтинг",
+        validators=[MinValueValidator(1), MaxValueValidator(5)],
+        help_text="Оценка от 1 до 5"
+    )
+    anonymous_feedback = models.TextField("Анонимный отзыв", blank=True)
+    suggestions = models.TextField("Предложения", blank=True)
+    feedback_type = models.CharField(
+        "Тип отзыва", 
+        max_length=20, 
+        choices=FEEDBACK_TYPES,
+        default='coffee'
+    )
+    is_anonymous = models.BooleanField("Анонимно", default=True)
+    created_at = models.DateTimeField("Дата отзыва", auto_now_add=True)
+
+    def __str__(self):
+        return f"Отзыв от {self.employee.full_name if not self.is_anonymous else 'Аноним'} на встречу {self.meeting.meeting_id}"
+
+    def calculate_impact_score(self):
+        """
+        Расчёт влияния отзыва.
+        Например, низкая оценка имеет большее влияние.
+        """
+        return (5 - self.rating) * 0.5 + len(self.anonymous_feedback) * 0.01
+
+    class Meta:
+        unique_together = ['meeting', 'employee']
+        verbose_name = 'Отзыв о встрече'
+        verbose_name_plural = 'Отзывы о встречах'
+        db_table = 'meeting_feedback'
+        ordering = ['-created_at']

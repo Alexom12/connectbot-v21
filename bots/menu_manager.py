@@ -18,6 +18,7 @@ class MenuManager:
             [InlineKeyboardButton("Мой профиль", callback_data="menu_profile")],
             [InlineKeyboardButton("Мои интересы", callback_data="menu_interests")],
             [InlineKeyboardButton("Календарь активностей", callback_data="menu_calendar")],
+            [InlineKeyboardButton("📝 Оставить отзыв", callback_data="feedback_start")],
             [InlineKeyboardButton("Достижения", callback_data="menu_achievements")],
             [InlineKeyboardButton("Помощь", callback_data="menu_help")],
             [InlineKeyboardButton("Настройки", callback_data="menu_settings")],

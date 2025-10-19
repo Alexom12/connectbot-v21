@@ -26,6 +26,11 @@ from asgiref.sync import sync_to_async
 from employees.utils import AuthManager, PreferenceManager
 from employees.redis_utils import RedisManager
 from bots.menu_manager import MenuManager
+from bots.handlers.feedback_handlers import feedback_conv_handler
+from bots.handlers.common_handlers import help_command
+from bots.handlers.error_handlers import global_error_handler
+from bots.scheduler import start_scheduler, stop_scheduler
+from bots.bot_instance import set_bot_instance
 
 logger = logging.getLogger(__name__)
 
@@ -58,6 +63,7 @@ class ImprovedConnectBot:
         """Корректное завершение работы бота"""
         try:
             if self.application:
+                stop_scheduler()
                 await self.application.stop()
                 await self.application.shutdown()
             logger.info("Бот корректно остановлен")
@@ -228,6 +234,10 @@ class ImprovedConnectBot:
                 
             elif callback_data == "menu_interests":
                 await self.show_interests_menu(update, context, employee)
+
+            elif callback_data == "feedback_start":
+                # Передаем управление в ConversationHandler
+                return await feedback_conv_handler.entry_points[0].callback(update, context)
                 
             elif callback_data == "setup_preferences":
                 await self.show_interests_menu(update, context, employee)
@@ -269,16 +279,7 @@ class ImprovedConnectBot:
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /help"""
-        help_text = (
-            "🤖 *ConnectBot - Помощь*\n\n"
-            "📋 *Доступные команды:*\n"
-            "/start - Авторизация и главное меню\n"
-            "/menu - Главное меню\n"
-            "/preferences - Настройка интересов\n"
-            "/help - Эта справка\n\n"
-            "💡 *Совет:* Используйте кнопки меню для удобной навигации!"
-        )
-        await update.message.reply_text(help_text, parse_mode='Markdown')
+        await help_command(update, context)
     
     def setup_handlers(self):
         """Настройка обработчиков команд"""
@@ -289,6 +290,7 @@ class ImprovedConnectBot:
         self.application.add_handler(CommandHandler("menu", self.menu))
         
         # Callback-обработчики
+        self.application.add_handler(feedback_conv_handler)
         self.application.add_handler(CallbackQueryHandler(self.handle_callback))
         
         # Обработчик текстовых сообщений
@@ -315,17 +317,9 @@ class ImprovedConnectBot:
             parse_mode='Markdown'
         )
     
-    async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+    async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE):
         """Глобальный обработчик ошибок"""
-        logger.error(f"Необработанная ошибка: {context.error}")
-        
-        if update and update.effective_message:
-            try:
-                await update.effective_message.reply_text(
-                    "❌ Произошла техническая ошибка. Администратор уведомлен."
-                )
-            except:
-                pass  # Игнорируем ошибки при отправке сообщения об ошибке
+        await global_error_handler(update, context)
     
     async def run_async(self):
         """Асинхронный запуск бота с улучшенной обработкой"""
@@ -350,10 +344,16 @@ class ImprovedConnectBot:
         
         # Настраиваем обработчики
         self.setup_handlers()
+
+        # Сохраняем экземпляр бота для доступа из других модулей
+        set_bot_instance(self.application)
         
         self.running = True
         
         try:
+            # Запускаем планировщик
+            start_scheduler()
+
             # Инициализируем приложение
             await self.application.initialize()
             await self.application.start()
