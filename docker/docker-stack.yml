@@ -21,7 +21,7 @@ services:
       - app-net
 
   web:
-    image: alexom12/connectbot-web:latest
+    image: alexom12/connectbot-web:final-fix
     ports:
       - "8000:8000"
     environment:
