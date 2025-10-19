@@ -14,6 +14,9 @@ COPY requirements.txt /app/
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # copy project
+COPY . /app/
+
+# copy entrypoint
 COPY ./docker/web-entrypoint.sh /app/web-entrypoint.sh
 RUN dos2unix /app/web-entrypoint.sh && chmod +x /app/web-entrypoint.sh
 
