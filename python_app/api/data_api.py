@@ -2,7 +2,9 @@ import os
 import json
 import hashlib
 import logging
+import secrets as _secrets
 from time import perf_counter
+from django.conf import settings
 
 from django.http import JsonResponse
 from django.views.decorators.http import require_POST, require_GET
@@ -32,6 +34,20 @@ else:
     CACHE_HITS = CACHE_MISSES = None
 
 
+def _read_service_token_from_file():
+    # Docker secrets are often mounted at /run/secrets/<name>
+    token_file = os.getenv('SERVICE_AUTH_TOKEN_FILE', '/run/secrets/service_auth_token')
+    try:
+        if os.path.exists(token_file):
+            with open(token_file, 'r', encoding='utf-8') as fh:
+                data = fh.read()
+                # strip BOM and whitespace/newlines
+                return data.replace('\ufeff', '').strip()
+    except Exception:
+        logger.debug('Failed to read service token from file %s', token_file)
+    return ''
+
+
 def _auth_ok(request):
     header = request.headers.get('Authorization') or request.META.get('HTTP_AUTHORIZATION', '')
     if not header:
@@ -42,10 +58,37 @@ def _auth_ok(request):
     scheme, token = parts
     if scheme.lower() != 'service':
         return False
-    expected = os.getenv('SERVICE_AUTH_TOKEN', '')
+
+    # Prefer Django settings.SERVICE_AUTH_TOKEN if set (useful in tests/CI)
+    expected = getattr(settings, 'SERVICE_AUTH_TOKEN', None) or os.getenv('SERVICE_AUTH_TOKEN', '')
     if not expected:
+        expected = _read_service_token_from_file()
+
+    if not expected:
+        # no configured token -> fail closed
+        logger.warning('No service auth token configured for Data API')
         return False
-    return token == expected
+
+    # Normalize token (strip BOM/newlines/spaces)
+    token_norm = token.replace('\ufeff', '').strip()
+    expected_norm = expected.replace('\ufeff', '').strip()
+
+    # Masked logging for debugging: show first 8 chars and length only
+    try:
+        def _mask(s: str):
+            if not s:
+                return '<empty>'
+            return s[:8] + '...' if len(s) > 8 else s
+
+        if not _secrets.compare_digest(token_norm, expected_norm):
+            logger.warning('Unauthorized request; Authorization header present repr=%r, token_mask=%s, token_len=%d, expected_mask=%s, expected_len=%d',
+                           header, _mask(token_norm), len(token_norm), _mask(expected_norm), len(expected_norm))
+            return False
+    except Exception:
+        logger.exception('Error during auth token comparison')
+        return False
+
+    return True
 
 
 def _cache_key_for_request(prefix: str, body: dict) -> str:

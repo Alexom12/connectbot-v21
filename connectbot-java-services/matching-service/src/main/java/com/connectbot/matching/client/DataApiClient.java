@@ -46,15 +46,20 @@ public class DataApiClient {
             @Value("${dataapi.retry.backoff-ms:200}") long baseBackoffMs) {
         this.restTemplate = restTemplate;
         this.baseUrl = baseUrl.endsWith("/") ? baseUrl.substring(0, baseUrl.length() - 1) : baseUrl;
-        // If serviceToken is empty, attempt to read from a secrets file (Docker secrets)
+        // If serviceToken is empty, attempt to read from a secrets file (Docker
+        // secrets)
         String token = serviceToken;
         if (token == null || token.isEmpty()) {
-            String tokenFile = System.getenv().getOrDefault("DATAAPI_SERVICE_TOKEN_FILE", "/run/secrets/service_auth_token");
+            String tokenFile = System.getenv().getOrDefault("DATAAPI_SERVICE_TOKEN_FILE",
+                    "/run/secrets/service_auth_token");
             try {
                 if (Files.exists(Paths.get(tokenFile))) {
                     byte[] bytes = Files.readAllBytes(Paths.get(tokenFile));
-                    token = new String(bytes, StandardCharsets.UTF_8).trim();
+                    token = new String(bytes, StandardCharsets.UTF_8);
+                    // normalize: strip BOM and newlines, then trim
+                    token = token.replace("\uFEFF", "").replace("\r", "").replace("\n", "").trim();
                     logger.info("Loaded Data API service token from file {}", tokenFile);
+                    logger.info("DataApiClient loaded service token mask={} len={}", maskToken(token), token.length());
                 }
             } catch (IOException e) {
                 logger.debug("Service token file not available at {}: {}", tokenFile, e.getMessage());
@@ -67,13 +72,14 @@ public class DataApiClient {
     }
 
     /**
-     * Compatibility constructor used by tests when an ObjectMapper bean is not provided.
+     * Compatibility constructor used by tests when an ObjectMapper bean is not
+     * provided.
      */
     public DataApiClient(RestTemplate restTemplate,
-                         String baseUrl,
-                         String serviceToken,
-                         int maxAttempts,
-                         int baseBackoffMs) {
+            String baseUrl,
+            String serviceToken,
+            int maxAttempts,
+            int baseBackoffMs) {
         this(restTemplate, new ObjectMapper(), baseUrl, serviceToken, maxAttempts, (long) baseBackoffMs);
     }
 
@@ -82,7 +88,10 @@ public class DataApiClient {
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         if (serviceToken != null && !serviceToken.isEmpty()) {
-            headers.set("Authorization", "Service " + serviceToken);
+            // ensure token is normalized before sending
+            String tok = serviceToken.replace("\uFEFF", "").replace("\r", "").replace("\n", "").trim();
+            logger.info("Setting Authorization header token_mask={} token_len={}", maskToken(tok), tok.length());
+            headers.set("Authorization", "Service " + tok);
         }
         String jsonBody;
         try {
@@ -123,6 +132,12 @@ public class DataApiClient {
                 }
             }
         }
+    }
+
+    private static String maskToken(String s) {
+        if (s == null || s.isEmpty()) return "<empty>";
+        if (s.length() <= 8) return s + " len=" + s.length();
+        return s.substring(0, 8) + "...";
     }
 
     public boolean healthCheck() {

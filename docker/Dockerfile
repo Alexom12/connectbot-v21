@@ -14,12 +14,8 @@ COPY requirements.txt /app/
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # copy project
-COPY . /app
+COPY ./docker/web-entrypoint.sh /app/web-entrypoint.sh
+RUN chmod +x /app/web-entrypoint.sh
 
-EXPOSE 8000
-
-# default command is handled by docker-compose to run migrations and server
-
-# Ensure container runs the Django development server when deployed as an image
-# so the service does not immediately exit after running one-off commands.
+ENTRYPOINT ["/app/web-entrypoint.sh"]
 CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
