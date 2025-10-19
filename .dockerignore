@@ -1,0 +1,42 @@
+# Git
+.git/
+.gitignore
+
+# VS Code
+.vscode/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+venv/
+.env
+.env.*
+
+# Базы данных
+*.sqlite3
+
+# Логи
+*.log
+logs/
+
+# Секреты и ключи
+deploy_key
+deploy_key.pub
+*.txt
+
+# Скрипты Windows
+*.ps1
+*.bat
+
+# Документация
+*.md
+
+# Docker
+docker/
+docker-compose*.yml
+Dockerfile*
+
+# Java-сервисы (не нужны в Python-образе)
+connectbot-java-services/

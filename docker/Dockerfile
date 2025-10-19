@@ -14,6 +14,12 @@ COPY requirements.txt /app/
 RUN pip install --upgrade pip && pip install -r requirements.txt
 
 # copy project
+COPY . /app
+
+# --- DEBUG: List the contents of the /app directory ---
+RUN ls -la /app
+
+# copy the entrypoint script and make it executable
 COPY ./docker/web-entrypoint.sh /app/web-entrypoint.sh
 RUN chmod +x /app/web-entrypoint.sh
 
