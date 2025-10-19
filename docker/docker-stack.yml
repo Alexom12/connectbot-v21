@@ -1,30 +1,45 @@
 version: '3.8'
 
+secrets:
+  django_secret_key:
+    external: true
+  service_auth_token:
+    external: true
+  telegram_bot_token:
+    external: true
+
+networks:
+  app-net:
+    driver: overlay
+    name: connectbot-net
+    attachable: true
+
 services:
-  matching-service:
-    image: alexom12/connectbot-matching:latest
-    ports:
-      - "8081:8081"
-    secrets:
-      - service_auth_token
-    environment:
-      DATAAPI_SERVICE_TOKEN_FILE: /run/secrets/service_auth_token
+  redis:
+    image: redis:alpine
+    networks:
+      - app-net
 
   web:
     image: alexom12/connectbot-web:latest
     ports:
       - "8000:8000"
+    environment:
+      - DJANGO_SETTINGS_MODULE=config.settings
     secrets:
       - django_secret_key
       - service_auth_token
-    environment:
-      DJANGO_SECRET_KEY_FILE: /run/secrets/django_secret_key
-      SERVICE_AUTH_TOKEN_FILE: /run/secrets/service_auth_token
+      - telegram_bot_token
+    depends_on:
+      - redis
+    networks:
+      - app-net
 
-secrets:
-  service_auth_token:
-    external: true
-  django_secret_key:
-    external: true
-  telegram_bot_token:
-    external: true
+  matching-service:
+    image: alexom12/connectbot-matching-service:latest
+    secrets:
+      - service_auth_token
+    depends_on:
+      - web
+    networks:
+      - app-net
