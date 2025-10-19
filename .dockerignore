@@ -21,10 +21,12 @@ venv/
 *.log
 logs/
 
-# Секреты и ключи
+# Секреты и ключи - оставляем их вне образа
 deploy_key
 deploy_key.pub
-*.txt
+django_secret_key.txt
+service_auth_token.txt
+telegram_token.txt
 
 # Скрипты Windows
 *.ps1
@@ -33,10 +35,10 @@ deploy_key.pub
 # Документация
 *.md
 
-# Docker
-docker/
-docker-compose*.yml
-Dockerfile*
+# НЕ игнорируем Docker-файлы, они нужны для сборки
+# docker/
+# docker-compose*.yml
+# Dockerfile*
 
 # Java-сервисы (не нужны в Python-образе)
 connectbot-java-services/
