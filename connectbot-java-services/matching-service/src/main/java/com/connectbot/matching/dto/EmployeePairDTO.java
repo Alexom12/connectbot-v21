@@ -5,29 +5,32 @@ package com.connectbot.matching.dto;
  */
 public class EmployeePairDTO {
 
-    private Long employee1_id;
-    private Long employee2_id;
+    private EmployeeDTO employee1;
+    private EmployeeDTO employee2;
 
-    public EmployeePairDTO(Long employee1_id, Long employee2_id) {
-        this.employee1_id = employee1_id;
-        this.employee2_id = employee2_id;
+    public EmployeePairDTO() {
+    }
+
+    public EmployeePairDTO(EmployeeDTO employee1, EmployeeDTO employee2) {
+        this.employee1 = employee1;
+        this.employee2 = employee2;
     }
 
     // Getters and Setters
 
-    public Long getEmployee1_id() {
-        return employee1_id;
+    public EmployeeDTO getEmployee1() {
+        return employee1;
     }
 
-    public void setEmployee1_id(Long employee1_id) {
-        this.employee1_id = employee1_id;
+    public void setEmployee1(EmployeeDTO employee1) {
+        this.employee1 = employee1;
     }
 
-    public Long getEmployee2_id() {
-        return employee2_id;
+    public EmployeeDTO getEmployee2() {
+        return employee2;
     }
 
-    public void setEmployee2_id(Long employee2_id) {
-        this.employee2_id = employee2_id;
+    public void setEmployee2(EmployeeDTO employee2) {
+        this.employee2 = employee2;
     }
 }
