@@ -28,13 +28,6 @@ import com.connectbot.matching.dto.MatchingResponseDTO;
 public class MatchingService {
 
     private static final Logger logger = LoggerFactory.getLogger(MatchingService.class);
-
-    /**
-     * Простой алгоритм случайного matching для кофе
-     * 
-     * @param employees список сотрудников
-     * @return результат matching с парами
-     */
     private final DataApiClient dataApiClient;
 
     @Autowired
@@ -42,6 +35,12 @@ public class MatchingService {
         this.dataApiClient = dataApiClient;
     }
 
+    /**
+     * Простой алгоритм случайного matching для кофе
+     * 
+     * @param employees список сотрудников
+     * @return результат matching с парами
+     */
     public MatchingResult simpleRandomMatching(List<Employee> employees) {
         logger.info("🔥 HOT-RELOAD TEST: v2 🔥 Запуск простого случайного matching для {} сотрудников",
                 employees.size());
@@ -100,29 +99,44 @@ public class MatchingService {
      * V1 API
      */
     public MatchingResponseDTO runSecretCoffee(MatchingRequestDTO request) {
-        if (request == null || request.getEmployees() == null) {
-            return new MatchingResponseDTO();
+        logger.info("Starting secret coffee matching, request_id={}", request.getRequestId());
+
+        // 1. Получить данные о сотрудниках из Data API
+        DataApiEmployeesResponseDTO employeesResponse;
+        try {
+            employeesResponse = dataApiClient.getEmployeesForMatching(request.getAlgorithmParams());
+        } catch (RestClientException e) {
+            logger.error("Failed to get employees from Data API: {}", e.getMessage());
+            // Consider a more specific error DTO
+            return new MatchingResponseDTO(request.getRequestId(), "error", "data_api_failed", null, null);
         }
 
-        List<Employee> modelEmployees = new ArrayList<>();
-        for (EmployeeDTO dto : request.getEmployees()) {
-            Employee e = new Employee();
-            e.setId(dto.getId());
-            e.setDisplayName("user-" + dto.getId());
-            e.setDepartment(dto.getDepartment());
-            modelEmployees.add(e);
+        if (employeesResponse == null || employeesResponse.getEmployees() == null) {
+            logger.warn("Data API returned null or empty employee list");
+            return new MatchingResponseDTO(request.getRequestId(), "error", "no_employees_from_api", null, null);
         }
 
-        MatchingResult result = simpleRandomMatching(modelEmployees);
-        MatchingResponseDTO response = new MatchingResponseDTO();
-        List<EmployeePairDTO> pairs = new ArrayList<>();
-        if (result.getPairs() != null) {
-            for (EmployeePair p : result.getPairs()) {
-                pairs.add(new EmployeePairDTO(p.getEmployee1().getId(), p.getEmployee2().getId()));
-            }
-        }
-        response.setPairs(pairs);
-        return response;
+        List<Employee> employees = employeesResponse.getEmployees().stream()
+                .map(Employee::fromDTO)
+                .collect(Collectors.toList());
+
+        logger.info("Received {} employees from Data API", employees.size());
+
+        // 2. Выполнить matching
+        MatchingResult result = simpleRandomMatching(employees);
+        logger.info("Matching complete, created {} pairs", result.getPairs().size());
+
+        // 3. Преобразовать результат в DTO
+        List<EmployeePairDTO> pairDTOs = result.getPairs().stream()
+                .map(EmployeePair::toDTO)
+                .collect(Collectors.toList());
+
+        return new MatchingResponseDTO(
+                request.getRequestId(),
+                "ok",
+                null,
+                pairDTOs,
+                result.getMeta());
     }
 
     /**
@@ -247,5 +261,25 @@ public class MatchingService {
                 pairs.size(), unmatched.size());
 
         return result;
+    }
+
+    /**
+     * Пример сложного алгоритма matching (пока просто вызывает случайный)
+     * 
+     * @param request параметры запроса
+     * @return результат matching
+     */
+    public MatchingResponseDTO runAdvancedMatching(MatchingRequestDTO request) {
+        logger.info("Запуск продвинутого matching для запроса {}", request.getRequestId());
+
+        // Здесь может быть сложная логика, пока просто случайный
+        MatchingResponseDTO randomResult = runSecretCoffee(request);
+
+        // Пример модификации результата
+        randomResult.setRequestId(request.getRequestId());
+        randomResult.setAlgorithm("ADVANCED_RANDOM");
+
+        logger.info("Продвинутый matching завершен для запроса {}", request.getRequestId());
+        return randomResult;
     }
 }
