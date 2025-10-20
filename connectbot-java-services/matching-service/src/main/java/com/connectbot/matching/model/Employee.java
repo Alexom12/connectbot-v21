@@ -132,4 +132,21 @@ public class Employee {
     public boolean hasInterest(String interest) {
         return interests != null && interests.contains(interest);
     }
+
+    public static Employee fromDTO(com.connectbot.matching.dto.EmployeeDTO dto) {
+        if (dto == null) {
+            return null;
+        }
+        Employee emp = new Employee();
+        emp.setId(dto.getId());
+        emp.setDisplayName(dto.getDisplayName());
+        emp.setDepartment(dto.getDepartment());
+        emp.setInterests(dto.getInterests());
+        emp.setActiveEmployee(dto.isActiveEmployee());
+        emp.setPosition(dto.getPosition());
+        emp.setBusinessCode(dto.getBusinessCode());
+        emp.setEmployeeNumber(dto.getEmployeeNumber());
+        emp.setUsername(dto.getUsername());
+        return emp;
+    }
 }
