@@ -11,8 +11,8 @@ public class EmployeeDTO {
     private Long id;
     private String displayName;
     private String department;
-    private boolean activeEmployee;
     private List<String> interests;
+    private boolean activeEmployee;
     private String position;
     private String businessCode;
     private Long employeeNumber;
@@ -73,6 +73,14 @@ public class EmployeeDTO {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getDisplayName() {
+        return displayName;
+    }
+
+    public void setDisplayName(String displayName) {
+        this.displayName = displayName;
     }
 
     public String getDepartment() {
