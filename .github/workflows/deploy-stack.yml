@@ -35,7 +35,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/connectbot-web:${{ github.sha }}
+          tags: ghcr.io/${{ toLower(github.repository_owner) }}/connectbot-web:${{ github.sha }}
           outputs: type=registry
 
       - name: Build and push matching-service image
@@ -45,7 +45,7 @@ jobs:
           context: connectbot-java-services/matching-service
           file: connectbot-java-services/matching-service/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/connectbot-matching:${{ github.sha }}
+          tags: ghcr.io/${{ toLower(github.repository_owner) }}/connectbot-matching:${{ github.sha }}
           outputs: type=registry
 
   deploy:
