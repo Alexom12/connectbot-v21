@@ -1,10 +1,14 @@
 package com.connectbot.matching.service;
 
+import com.connectbot.matching.client.DataApiClient;
 import com.connectbot.matching.model.Employee;
 import com.connectbot.matching.model.MatchingResult;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.boot.test.context.SpringBootTest;
+import org.junit.jupiter.api.extension.ExtendWith;
+import org.mockito.InjectMocks;
+import org.mockito.Mock;
+import org.mockito.junit.jupiter.MockitoExtension;
 
 import java.util.Arrays;
 import java.util.Collections;
@@ -18,15 +22,20 @@ import static org.junit.jupiter.api.Assertions.*;
  * @author ConnectBot Team
  * @version 1.0.0
  */
-@SpringBootTest
+@ExtendWith(MockitoExtension.class)
 class MatchingServiceTest {
     
+    @Mock
+    private DataApiClient dataApiClient;
+
+    @InjectMocks
     private MatchingService matchingService;
+    
     private List<Employee> testEmployees;
     
     @BeforeEach
     void setUp() {
-        matchingService = new MatchingService();
+        // matchingService создается автоматически с помощью @InjectMocks
         
         // Создаем тестовых сотрудников
         testEmployees = Arrays.asList(
