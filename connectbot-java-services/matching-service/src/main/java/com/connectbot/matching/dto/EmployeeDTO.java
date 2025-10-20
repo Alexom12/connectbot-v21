@@ -9,7 +9,14 @@ import java.util.List;
 public class EmployeeDTO {
 
     private Long id;
+    private String displayName;
     private String department;
+    private boolean activeEmployee;
+    private List<String> interests;
+    private String position;
+    private String businessCode;
+    private Long employeeNumber;
+    private String username;
     private Grade grade;
     private List<Long> excluded_partners;
     private EmployeePreferencesDTO preferences;
@@ -19,6 +26,38 @@ public class EmployeeDTO {
     }
 
     // Getters and Setters
+
+    public String getPosition() {
+        return position;
+    }
+
+    public void setPosition(String position) {
+        this.position = position;
+    }
+
+    public String getBusinessCode() {
+        return businessCode;
+    }
+
+    public void setBusinessCode(String businessCode) {
+        this.businessCode = businessCode;
+    }
+
+    public Long getEmployeeNumber() {
+        return employeeNumber;
+    }
+
+    public void setEmployeeNumber(Long employeeNumber) {
+        this.employeeNumber = employeeNumber;
+    }
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
 
     public Long getId() {
         return id;
