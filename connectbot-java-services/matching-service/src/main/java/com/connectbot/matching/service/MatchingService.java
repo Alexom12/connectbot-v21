@@ -131,12 +131,14 @@ public class MatchingService {
                 .map(EmployeePair::toDTO)
                 .collect(Collectors.toList());
 
-        return new MatchingResponseDTO(
+        MatchingResponseDTO randomResult = new MatchingResponseDTO(
                 request.getRequestId(),
                 "ok",
                 null,
                 pairDTOs,
                 result.getMeta());
+        randomResult.setAlgorithm("simple_random");
+        return randomResult;
     }
 
     /**
