@@ -11,8 +11,8 @@ COPY mvnw ./
 
 # Download dependencies and build (skip the `dependency:go-offline` step because
 # it can fail due to cached negative plugin resolution in intermediate layers).
-RUN chmod +x mvnw && \
-    sh -c "./mvnw -B -DskipTests -Dmaven.test.skip=true -U package"
+RUN ["chmod", "+x", "mvnw"]
+RUN ["./mvnw", "-B", "-DskipTests", "-Dmaven.test.skip=true", "-U", "package"]
 
 # Stage 2: runtime image with minimal JRE
 FROM eclipse-temurin:21-jre
