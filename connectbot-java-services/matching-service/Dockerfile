@@ -5,8 +5,8 @@ FROM eclipse-temurin:21-jdk-jammy as builder
 # Install Maven
 ARG MAVEN_VERSION=3.9.6
 ARG USER_HOME_DIR="/root"
-ARG SHA=e9f8715743438038333e385202110c767755324f053a6b5b351772157735214b1009b82332504653423539421be22725a5f5273ae63333a202024941155e047c
-ARG BASE_URL=https://apache.osuosl.org/maven/maven-3/${MAVEN_VERSION}/binaries
+ARG SHA=b9a31814a67b3a2dc3830333d233f531b2a5a8ac4032a8f5d8a21b52635a8a7c28a0c3b6b689282716f5a6f10134186f23c508e1f6103051820021a01b3b700b
+ARG BASE_URL=https://dlcdn.apache.org/maven/maven-3/${MAVEN_VERSION}/binaries
 
 RUN apt-get update && \
     apt-get install -y curl && \
