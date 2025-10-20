@@ -27,6 +27,14 @@ public class EmployeeDTO {
 
     // Getters and Setters
 
+    public boolean isActiveEmployee() {
+        return activeEmployee;
+    }
+
+    public void setActiveEmployee(boolean activeEmployee) {
+        this.activeEmployee = activeEmployee;
+    }
+
     public String getPosition() {
         return position;
     }
