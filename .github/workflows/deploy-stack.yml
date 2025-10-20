@@ -62,16 +62,6 @@ jobs:
       - name: Wait for images available (small pause)
         run: sleep 3
 
-      - name: Check SSH connection
-        run: |
-          echo "Attempting to connect to ${{ secrets.SSH_HOST }} on port 22..."
-          if ! command -v nc &> /dev/null
-          then
-              echo "netcat could not be found, installing..."
-              sudo apt-get update && sudo apt-get install -y netcat
-          fi
-          nc -zv ${{ secrets.SSH_HOST }} 22
-
       - name: Create remote secrets and deploy stack via SSH
         uses: appleboy/ssh-action@v0.1.8
         with:
