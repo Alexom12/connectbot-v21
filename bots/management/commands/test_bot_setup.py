@@ -20,9 +20,8 @@ class Command(BaseCommand):
             )
             self.stdout.write('💡 Добавьте TELEGRAM_BOT_TOKEN=ваш_токен в файл .env')
         else:
-            token_preview = settings.TELEGRAM_BOT_TOKEN[:10] + '...'
             self.stdout.write(
-                self.style.SUCCESS(f'✅ TELEGRAM_BOT_TOKEN найден: {token_preview}')
+                self.style.SUCCESS('✅ TELEGRAM_BOT_TOKEN найден')
             )
         
         # Проверяем импорты

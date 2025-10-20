@@ -15,7 +15,8 @@ public class MatchingResponseDTO {
     private List<EmployeePairDTO> pairs;
     private Map<String, Object> meta;
 
-    public MatchingResponseDTO(String requestId, String status, String error, List<EmployeePairDTO> pairs, Map<String, Object> meta) {
+    public MatchingResponseDTO(String requestId, String status, String error, List<EmployeePairDTO> pairs,
+            Map<String, Object> meta) {
         this.requestId = requestId;
         this.status = status;
         this.error = error;
