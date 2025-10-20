@@ -15,6 +15,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Compute lowercase owner
+        id: owner
+        run: |
+          # compute lowercase owner to satisfy registry naming (Docker requires lowercase)
+          echo "owner=$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v2
 
@@ -35,7 +41,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: ghcr.io/${{ toLower(github.repository_owner) }}/connectbot-web:${{ github.sha }}
+          tags: ghcr.io/${{ steps.owner.outputs.owner }}/connectbot-web:${{ github.sha }}
           outputs: type=registry
 
       - name: Build and push matching-service image
@@ -45,7 +51,7 @@ jobs:
           context: connectbot-java-services/matching-service
           file: connectbot-java-services/matching-service/Dockerfile
           push: true
-          tags: ghcr.io/${{ toLower(github.repository_owner) }}/connectbot-matching:${{ github.sha }}
+          tags: ghcr.io/${{ steps.owner.outputs.owner }}/connectbot-matching:${{ github.sha }}
           outputs: type=registry
 
   deploy:
