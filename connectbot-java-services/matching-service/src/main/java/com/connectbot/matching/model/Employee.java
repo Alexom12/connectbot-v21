@@ -1,5 +1,7 @@
 package com.connectbot.matching.model;
 
+import com.connectbot.matching.dto.EmployeeDTO;
+
 import java.util.List;
 
 /**
@@ -111,6 +113,20 @@ public class Employee {
 
     public void setInterests(List<String> interests) {
         this.interests = interests;
+    }
+
+    public EmployeeDTO toDTO() {
+        EmployeeDTO dto = new EmployeeDTO();
+        dto.setId(this.id);
+        dto.setDisplayName(this.displayName);
+        dto.setDepartment(this.department);
+        dto.setInterests(this.interests);
+        dto.setActiveEmployee(this.activeEmployee);
+        dto.setPosition(this.position);
+        dto.setBusinessCode(this.businessCode);
+        dto.setEmployeeNumber(this.employeeNumber);
+        dto.setUsername(this.username);
+        return dto;
     }
 
     public boolean hasInterest(String interest) {

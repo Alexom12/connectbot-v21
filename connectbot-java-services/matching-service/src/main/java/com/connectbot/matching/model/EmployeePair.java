@@ -1,5 +1,7 @@
 package com.connectbot.matching.model;
 
+import com.connectbot.matching.dto.EmployeePairDTO;
+
 /**
  * Минимальная модель пары сотрудников.
  */
@@ -29,6 +31,13 @@ public class EmployeePair {
 
     public void setEmployee2(Employee employee2) {
         this.employee2 = employee2;
+    }
+
+    public EmployeePairDTO toDTO() {
+        EmployeePairDTO dto = new EmployeePairDTO();
+        dto.setEmployee1(this.employee1 != null ? this.employee1.toDTO() : null);
+        dto.setEmployee2(this.employee2 != null ? this.employee2.toDTO() : null);
+        return dto;
     }
 
     // Пара считается валидной, если оба сотрудника не null и имеют разные id
