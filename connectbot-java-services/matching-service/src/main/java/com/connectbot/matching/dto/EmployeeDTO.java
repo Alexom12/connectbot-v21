@@ -83,6 +83,14 @@ public class EmployeeDTO {
         this.department = department;
     }
 
+    public List<String> getInterests() {
+        return interests;
+    }
+
+    public void setInterests(List<String> interests) {
+        this.interests = interests;
+    }
+
     public Grade getGrade() {
         return grade;
     }
