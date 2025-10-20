@@ -1,6 +1,8 @@
 package com.connectbot.matching.model;
 
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 /**
  * Минимальная модель результата matching.
@@ -9,14 +11,28 @@ public class MatchingResult {
     private List<EmployeePair> pairs;
     private List<Employee> unmatched;
     private String algorithm;
+    private Map<String, Object> meta;
 
     public MatchingResult() {
+        this.meta = new HashMap<>();
     }
 
     public MatchingResult(List<EmployeePair> pairs, List<Employee> unmatched, String algorithm) {
         this.pairs = pairs;
         this.unmatched = unmatched;
         this.algorithm = algorithm;
+        this.meta = new HashMap<>();
+        this.meta.put("unmatched_count", unmatched != null ? unmatched.size() : 0);
+        this.meta.put("total_pairs", pairs != null ? pairs.size() : 0);
+        this.meta.put("algorithm", algorithm);
+    }
+
+    public Map<String, Object> getMeta() {
+        return meta;
+    }
+
+    public void setMeta(Map<String, Object> meta) {
+        this.meta = meta;
     }
 
     public List<EmployeePair> getPairs() {
