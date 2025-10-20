@@ -35,7 +35,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/connectbot-web:latest
+          tags: ghcr.io/${{ github.repository_owner }}/connectbot-web:${{ github.sha }}
           outputs: type=registry
 
       - name: Build and push matching-service image
@@ -45,7 +45,7 @@ jobs:
           context: connectbot-java-services/matching-service
           file: connectbot-java-services/matching-service/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository_owner }}/connectbot-matching:latest
+          tags: ghcr.io/${{ github.repository_owner }}/connectbot-matching:${{ github.sha }}
           outputs: type=registry
 
   deploy:
@@ -65,21 +65,33 @@ jobs:
           port: ${{ secrets.DEPLOY_PORT }}
           script: |
             set -e
-            echo 'Creating/Updating Docker secrets (service_auth_token, django_secret_key, telegram_bot_token)'
+            
+            echo "Navigating to project directory"
+            cd /opt/connectbot-v21
+
+            echo "Pulling latest changes from Git"
+            git pull
+
+            echo 'Creating/Updating Docker secrets'
             # idempotent create: remove then create
-            if docker secret inspect service_auth_token >/dev/null 2>&1; then docker secret rm service_auth_token || true; fi
+            if docker secret inspect service_auth_token >/dev/null 2>&1; then docker secret rm service_auth_token; fi
             printf '%s' "${SERVICE_AUTH_TOKEN}" | docker secret create service_auth_token -
 
-            if docker secret inspect django_secret_key >/dev/null 2>&1; then docker secret rm django_secret_key || true; fi
+            if docker secret inspect django_secret_key >/dev/null 2>&1; then docker secret rm django_secret_key; fi
             printf '%s' "${DJANGO_SECRET_KEY}" | docker secret create django_secret_key -
 
             if [ -n "${TELEGRAM_BOT_TOKEN}" ]; then
-              if docker secret inspect telegram_bot_token >/dev/null 2>&1; then docker secret rm telegram_bot_token || true; fi
+              if docker secret inspect telegram_bot_token >/dev/null 2>&1; then docker secret rm telegram_bot_token; fi
               printf '%s' "${TELEGRAM_BOT_TOKEN}" | docker secret create telegram_bot_token -
             fi
 
+            echo "Pulling latest images from registry"
+            export WEB_IMAGE_TAG=${{ github.sha }}
+            export MATCHING_IMAGE_TAG=${{ github.sha }}
+            docker-compose -f /opt/connectbot-v21/docker/docker-stack.yml pull
+
             echo 'Deploying stack using docker/docker-stack.yml'
-            docker stack deploy -c /opt/connectbot-v21/docker/docker-stack.yml connectbot || true
+            docker stack deploy -c /opt/connectbot-v21/docker/docker-stack.yml connectbot --with-registry-auth
         env:
           # these are read from GitHub repository secrets and exported to remote shell via the ssh action
           SERVICE_AUTH_TOKEN: ${{ secrets.SERVICE_AUTH_TOKEN }}

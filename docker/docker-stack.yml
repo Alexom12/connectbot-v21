@@ -2,7 +2,7 @@ version: '3.8'
 
 services:
   matching-service:
-    image: alexom12/connectbot-matching:latest
+    image: ghcr.io/alexom12/connectbot-matching:${MATCHING_IMAGE_TAG:-latest}
     ports:
       - "8081:8081"
     secrets:
@@ -11,7 +11,7 @@ services:
       DATAAPI_SERVICE_TOKEN_FILE: /run/secrets/service_auth_token
 
   web:
-    image: alexom12/connectbot-web:latest
+    image: ghcr.io/alexom12/connectbot-web:${WEB_IMAGE_TAG:-latest}
     ports:
       - "8000:8000"
     secrets:
