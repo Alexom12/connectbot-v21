@@ -13,7 +13,7 @@ services:
     ports:
       - "8081:8081"
     volumes:
-      - ./service_auth_token.txt:/run/secrets/service_auth_token:ro
+      - ../service_auth_token.txt:/run/secrets/service_auth_token:ro
     environment:
       SPRING_DATASOURCE_URL: "jdbc:h2:mem:testdb"
       SERVICE_AUTH_TOKEN_FILE: "/run/secrets/service_auth_token"
@@ -29,10 +29,9 @@ services:
       - "8000:8000"
     volumes:
       - sqlite_data:/app/data
-      - ./service_auth_token.txt:/run/secrets/service_auth_token:ro
-      - ./telegram_bot_token.txt:/run/secrets/telegram_bot_token:ro
-      - ./telegram_bot_token_dev.txt:/run/secrets/telegram_bot_token_dev:ro
-      - ./django_secret_key.txt:/run/secrets/django_secret_key:ro
+      - ../service_auth_token.txt:/run/secrets/service_auth_token:ro
+      - ../telegram_bot_token_dev.txt:/run/secrets/telegram_bot_token_dev:ro
+      - ../django_secret_key.txt:/run/secrets/django_secret_key:ro
     environment:
       DEBUG: "0"
       DATABASE_URL: "sqlite:////app/data/db.sqlite3"
@@ -40,7 +39,7 @@ services:
       REDIS_URL: "redis://redis:6379/0"
       DJANGO_SECRET_KEY_FILE: "/run/secrets/django_secret_key"
       SERVICE_AUTH_TOKEN_FILE: "/run/secrets/service_auth_token"
-      TELEGRAM_BOT_TOKEN_FILE: "/run/secrets/telegram_bot_token"
+      TELEGRAM_BOT_TOKEN_FILE: "/run/secrets/telegram_bot_token_dev"
     depends_on:
       - redis
       - matching-service
@@ -52,10 +51,9 @@ services:
     command: python manage.py runbot
     volumes:
       - sqlite_data:/app/data
-      - ./service_auth_token.txt:/run/secrets/service_auth_token:ro
-      - ./telegram_bot_token.txt:/run/secrets/telegram_bot_token:ro
-      - ./telegram_bot_token_dev.txt:/run/secrets/telegram_bot_token_dev:ro
-      - ./django_secret_key.txt:/run/secrets/django_secret_key:ro
+      - ../service_auth_token.txt:/run/secrets/service_auth_token:ro
+      - ../telegram_bot_token_dev.txt:/run/secrets/telegram_bot_token_dev:ro
+      - ../django_secret_key.txt:/run/secrets/django_secret_key:ro
     environment:
       DEBUG: "0"
       DATABASE_URL: "sqlite:////app/data/db.sqlite3"
@@ -63,7 +61,7 @@ services:
       REDIS_URL: "redis://redis:6379/0"
       DJANGO_SECRET_KEY_FILE: "/run/secrets/django_secret_key"
       SERVICE_AUTH_TOKEN_FILE: "/run/secrets/service_auth_token"
-      TELEGRAM_BOT_TOKEN_FILE: "/run/secrets/telegram_bot_token"
+      TELEGRAM_BOT_TOKEN_FILE: "/run/secrets/telegram_bot_token_dev"
     depends_on:
       - redis
       - web

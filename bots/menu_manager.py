@@ -297,3 +297,36 @@ class MenuManager:
         return InlineKeyboardMarkup([
             [InlineKeyboardButton("↩️ Назад", callback_data=f"back_{target_menu}")]
         ])
+
+    # Backwards-compatible aliases for older callers that expect get_* naming
+    @staticmethod
+    async def get_main_menu(*args, **kwargs):
+        return await MenuManager.create_main_menu()
+
+    @staticmethod
+    async def get_profile_menu(employee, *args, **kwargs):
+        return await MenuManager.create_profile_menu(employee)
+
+    @staticmethod
+    async def get_interests_menu(employee, *args, **kwargs):
+        return await MenuManager.create_interests_menu(employee)
+
+    @staticmethod
+    async def get_calendar_menu(employee, *args, **kwargs):
+        return await MenuManager.create_calendar_menu(employee)
+
+    @staticmethod
+    async def get_achievements_menu(employee, *args, **kwargs):
+        return await MenuManager.create_achievements_menu(employee)
+
+    @staticmethod
+    async def get_help_menu(*args, **kwargs):
+        return await MenuManager.create_help_menu()
+
+    @staticmethod
+    async def get_settings_menu(*args, **kwargs):
+        return await MenuManager.create_settings_menu()
+
+    @staticmethod
+    async def get_back_button(target_menu="main", *args, **kwargs):
+        return await MenuManager.create_back_button(target_menu)

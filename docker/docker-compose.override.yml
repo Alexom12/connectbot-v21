@@ -1,0 +1,17 @@
+services:
+  web:
+    env_file:
+      - ./.env.dev
+      - ./.env.local
+      - docker/.env.local
+    # Use TELEGRAM_BOT_TOKEN from .env.dev for local development
+    volumes:
+      - ..:/app:delegated
+  bot:
+    env_file:
+      - ./.env.dev
+      - ./.env.local
+      - docker/.env.local
+    # Use TELEGRAM_BOT_TOKEN from .env.dev for local development
+    volumes:
+      - ..:/app:delegated

@@ -4,6 +4,7 @@
 import logging
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
+from bots.menu_manager import MenuManager
 
 logger = logging.getLogger(__name__)
 
@@ -58,7 +59,15 @@ async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /menu"""
-    menu_text = """
+    # Отправляем интерактивное главное меню (кнопки)
+    try:
+        menu_manager = MenuManager()
+        menu_data = await menu_manager.create_main_menu()
+        await update.message.reply_text(**menu_data)
+    except Exception as e:
+        logger.error(f"Ошибка отправки интерактивного меню: {e}")
+        # Фоллбэк на текстовое меню
+        menu_text = """
 📋 ГЛАВНОЕ МЕНЮ CONNECTBOT
 
 Выберите действие:
@@ -71,9 +80,8 @@ async def menu_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
 ❓ /help - Справка
 
 💡 Используйте команды или напишите сообщение для интерактивного меню
-    """
-    
-    await update.message.reply_text(menu_text)
+        """
+        await update.message.reply_text(menu_text)
 
 def setup_start_handlers(application: Application):
     """Настройка обработчиков команд запуска"""
