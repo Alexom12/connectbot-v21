@@ -118,6 +118,11 @@ class Command(BaseCommand):
         """Настройка основных обработчиков"""
         from telegram import Update
         from telegram.ext import CommandHandler, MessageHandler, filters, ContextTypes
+        # Use the interactive menu handler implemented in bots.handlers.start_handlers
+        try:
+            from bots.handlers.start_handlers import menu_command
+        except Exception:
+            menu_command = None
         
         async def start_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
             try:
@@ -288,7 +293,11 @@ class Command(BaseCommand):
         application.add_handler(CommandHandler("start", start_command))
         application.add_handler(CommandHandler("help", help_command))
         application.add_handler(CommandHandler("test", test_command))
-        application.add_handler(CommandHandler("menu", help_command))  # menu = help для простоты
+        # Prefer interactive menu if available, otherwise fall back to help
+        if menu_command:
+            application.add_handler(CommandHandler("menu", menu_command))
+        else:
+            application.add_handler(CommandHandler("menu", help_command))  # fallback: menu = help
         application.add_handler(CommandHandler("coffee", coffee_command))
         application.add_handler(CommandHandler("activities", activities_command))
         application.add_handler(CommandHandler("profile", profile_command))
