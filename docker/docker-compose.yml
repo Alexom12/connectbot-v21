@@ -65,6 +65,9 @@ services:
     depends_on:
       - redis
       - web
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   prometheus:
     image: prom/prometheus:latest

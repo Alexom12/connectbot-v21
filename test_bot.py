@@ -56,14 +56,15 @@ if __name__ == '__main__':
 
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
+from bots.utils.message_utils import reply_with_footer
 
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /start"""
-    await update.message.reply_text('🤖 ConnectBot работает!')
+    await reply_with_footer(update, '🤖 ConnectBot работает!')
 
 async def help_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработчик команды /help"""
-    await update.message.reply_text('Доступные команды:\n/start - начало работы\n/help - справка')
+    await reply_with_footer(update, 'Доступные команды:\n/start - начало работы\n/help - справка')
 
 def main():
     """Запуск бота"""

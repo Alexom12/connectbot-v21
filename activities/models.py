@@ -288,3 +288,33 @@ class MeetingFeedback(models.Model):
         verbose_name_plural = 'Отзывы о встречах'
         db_table = 'meeting_feedback'
         ordering = ['-created_at']
+
+
+# ------------------------------------------------------------
+# Backwards-compatible aliases
+# ------------------------------------------------------------
+# Historically `Activity` and related models lived in this module.
+# They were refactored to `employees.models`. Some modules still
+# import `Activity` / `ActivityParticipant` and `Meeting` from
+# `activities.models`. Provide compatibility aliases to avoid
+# ImportError while keeping a single canonical definition.
+try:
+    from employees.models import Activity as Activity
+    from employees.models import ActivityParticipant as ActivityParticipant
+except Exception:
+    # If import fails for any reason (e.g., circular import during
+    # migrations), leave names as None so the original ImportError
+    # surfaces in a clear way.
+    Activity = None
+    ActivityParticipant = None
+
+# Many modules referred to a `Meeting` model; map it to the secret
+# coffee meeting model used in this app to preserve behaviour.
+Meeting = SecretCoffeeMeeting
+
+__all__ = [
+    'ActivitySession', 'ActivityParticipant', 'ActivityPair',
+    'SecretCoffeeMeeting', 'SecretCoffeePreference', 'SecretCoffeeMessage',
+    'SecretCoffeeProposal', 'MeetingFeedback',
+    'Activity', 'ActivityParticipant', 'Meeting'
+]

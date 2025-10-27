@@ -11,3 +11,5 @@ gunicorn==22.0.0
 whitenoise==6.7.0
 prometheus-client==0.20.0
 django-apscheduler==0.6.2
+aiohttp==3.8.5
+tenacity==8.2.2

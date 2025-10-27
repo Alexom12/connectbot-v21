@@ -21,15 +21,30 @@ class BusinessCenterAdmin(admin.ModelAdmin):
     search_fields = ['name', 'address']
 
 
+class EmployeeInterestInline(admin.TabularInline):
+    model = EmployeeInterest
+    extra = 0
+    fields = ['interest', 'is_active', 'receive_notifications']
+
+
 @admin.register(Employee)
 class EmployeeAdmin(admin.ModelAdmin):
     list_display = [
         'full_name', 'position', 'department', 'business_center', 
-        'telegram_username', 'authorized', 'is_active'
+        'telegram_username', 'authorized', 'is_active', 'get_active_interests'
     ]
     list_filter = ['department', 'business_center', 'authorized', 'is_active']
     search_fields = ['full_name', 'telegram_username', 'position']
     readonly_fields = ['created_at', 'updated_at', 'last_activity']
+    inlines = [EmployeeInterestInline]
+
+    def get_active_interests(self, obj):
+        try:
+            active = obj.interests.filter(is_active=True).select_related('interest')
+            return ', '.join([f"{ei.interest.emoji} {ei.interest.name}" for ei in active]) if active else '-'
+        except Exception:
+            return '-'
+    get_active_interests.short_description = 'Активные интересы'
 
 
 @admin.register(Interest)
@@ -37,13 +52,6 @@ class InterestAdmin(admin.ModelAdmin):
     list_display = ['name', 'emoji', 'code', 'is_active', 'auto_schedule']
     list_filter = ['is_active', 'auto_schedule']
     search_fields = ['name', 'code']
-
-
-class EmployeeInterestInline(admin.TabularInline):
-    model = EmployeeInterest
-    extra = 1
-    fields = ['interest', 'is_active', 'receive_notifications']
-
 
 @admin.register(Activity)
 class ActivityAdmin(admin.ModelAdmin):

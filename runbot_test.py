@@ -25,6 +25,7 @@ from asgiref.sync import sync_to_async
 from employees.utils import AuthManager, PreferenceManager
 from employees.redis_utils import RedisManager
 from bots.menu_manager import MenuManager
+from bots.utils.message_utils import reply_with_footer
 
 # Настройка логирования
 logging.basicConfig(
@@ -102,10 +103,7 @@ class ConnectBotTest:
             
             if not is_authorized:
                 logger.warning(f"Неавторизован: {username}")
-                await update.message.reply_text(
-                    f"Доступ запрещен для {username}\\n"
-                    "Обратитесь к администратору."
-                )
+                await reply_with_footer(update, f"Доступ запрещен для {username}\\nОбратитесь к администратору.")
                 return
             
             # Получаем данные пользователя
@@ -132,13 +130,13 @@ class ConnectBotTest:
                     "/status - статус бота"
                 )
                 
-                await update.message.reply_text(response)
+                await reply_with_footer(update, response)
             else:
-                await update.message.reply_text("Ошибка получения данных пользователя")
+                await reply_with_footer(update, "Ошибка получения данных пользователя")
                 
         except Exception as e:
             logger.error(f"Ошибка в /start: {e}")
-            await update.message.reply_text("Техническая ошибка")
+            await reply_with_footer(update, "Техническая ошибка")
     
     async def menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /menu"""
@@ -149,7 +147,7 @@ class ConnectBotTest:
             session_data = await self.get_user_session(user.id)
             
             if not session_data:
-                await update.message.reply_text("Выполните /start для авторизации")
+                await reply_with_footer(update, "Выполните /start для авторизации")
                 return
             
             menu_manager = MenuManager()
@@ -158,11 +156,14 @@ class ConnectBotTest:
                 session_data.get('role')
             )
             
-            await update.message.reply_text(**menu_data)
+            if isinstance(menu_data, dict) and menu_data.get('reply_markup'):
+                await update.message.reply_text(**menu_data)
+            else:
+                await reply_with_footer(update, menu_data.get('text') if isinstance(menu_data, dict) else menu_data)
             
         except Exception as e:
             logger.error(f"Ошибка меню: {e}")
-            await update.message.reply_text("Ошибка загрузки меню")
+            await reply_with_footer(update, "Ошибка загрузки меню")
     
     async def status(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Команда статуса бота"""
@@ -185,11 +186,11 @@ class ConnectBotTest:
                 f"Бот работает: {'ДА' if self.is_running else 'НЕТ'}"
             )
             
-            await update.message.reply_text(status_text)
+            await reply_with_footer(update, status_text)
             
         except Exception as e:
             logger.error(f"Ошибка статуса: {e}")
-            await update.message.reply_text("Ошибка получения статуса")
+            await reply_with_footer(update, "Ошибка получения статуса")
     
     async def handle_callback(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик callback запросов"""
@@ -231,7 +232,7 @@ class ConnectBotTest:
             "/preferences - настройки"
         )
         
-        await update.message.reply_text(response)
+        await reply_with_footer(update, response)
     
     async def error_handler(self, update: object, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик ошибок"""
@@ -248,7 +249,7 @@ class ConnectBotTest:
         # Не отправляем сообщения при ошибках сети
         if update and hasattr(update, 'effective_message') and "TimedOut" not in str(error):
             try:
-                await update.effective_message.reply_text("Произошла ошибка")
+                await reply_with_footer(update, "Произошла ошибка")
             except:
                 pass
     

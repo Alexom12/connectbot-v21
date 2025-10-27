@@ -26,6 +26,7 @@ import httpx
 from employees.utils import AuthManager, PreferenceManager
 from employees.redis_utils import RedisManager
 from bots.menu_manager import MenuManager
+from bots.utils.message_utils import reply_with_footer
 
 # Настройка логирования без эмодзи для избежания проблем с кодировкой
 logging.basicConfig(
@@ -66,7 +67,7 @@ class ConnectBotSimple:
                 keepalive_expiry=60
             ),
             # Добавляем retry логику
-            transport=httpx.AsyncHTTPTransport(retries=3)
+            transport=httpx.AsyncHTTPTransport(retries=5)
         )
         
         return HTTPXRequest(client=httpx_client)
@@ -120,10 +121,7 @@ class ConnectBotSimple:
             
             if not is_authorized:
                 logger.warning(f"Неавторизованный пользователь: {username} (ID: {user_id})")
-                await update.message.reply_text(
-                    f"Извините, {username}, у вас нет доступа к этому боту.\\n"
-                    "Обратитесь к администратору для получения доступа."
-                )
+                await reply_with_footer(update, f"Извините, {username}, у вас нет доступа к этому боту.\nОбратитесь к администратору для получения доступа.")
                 return
             
             # Очищаем сессию пользователя
@@ -142,25 +140,15 @@ class ConnectBotSimple:
                 await self.update_user_session(user_id, session_data)
                 
                 logger.info(f"Пользователь {username} успешно авторизован как {employee_data['role']}")
-                
-                await update.message.reply_text(
-                    f"Привет, {employee_data['username']}!\\n"
-                    f"Ваша роль: {employee_data['role']}\\n\\n"
-                    "Добро пожаловать в ConnectBot!\\n"
-                    "Используйте /menu для доступа к основному меню."
-                )
+                await reply_with_footer(update, f"Привет, {employee_data['username']}!\nВаша роль: {employee_data['role']}\n\nДобро пожаловать в ConnectBot!\nИспользуйте /menu для доступа к основному меню.")
             else:
                 logger.error(f"Ошибка получения данных пользователя {username}")
-                await update.message.reply_text(
-                    "Произошла ошибка при авторизации. Попробуйте позже или обратитесь к администратору."
-                )
+                await reply_with_footer(update, "Произошла ошибка при авторизации. Попробуйте позже или обратитесь к администратору.")
                 
         except Exception as e:
             logger.error(f"Ошибка в команде /start: {e}", exc_info=True)
             try:
-                await update.message.reply_text(
-                    "Произошла техническая ошибка. Попробуйте позже."
-                )
+                await reply_with_footer(update, "Произошла техническая ошибка. Попробуйте позже.")
             except Exception as reply_error:
                 logger.error(f"Ошибка отправки сообщения об ошибке: {reply_error}")
     
@@ -171,22 +159,23 @@ class ConnectBotSimple:
             session_data = await self.get_user_session(user_id)
             
             if not session_data:
-                await update.message.reply_text("Сессия истекла. Введите /start для повторной авторизации.")
+                await reply_with_footer(update, "Сессия истекла. Введите /start для повторной авторизации.")
                 return
-            
             # Получаем меню через MenuManager
             menu_manager = MenuManager()
             menu_data = await sync_to_async(menu_manager.get_main_menu)(
                 session_data.get('employee_id'),
                 session_data.get('role')
             )
-            
-            await update.message.reply_text(**menu_data)
+            if isinstance(menu_data, dict) and menu_data.get('reply_markup'):
+                await update.message.reply_text(**menu_data)
+            else:
+                await reply_with_footer(update, menu_data.get('text') if isinstance(menu_data, dict) else menu_data)
             
         except Exception as e:
             logger.error(f"Ошибка показа главного меню: {e}", exc_info=True)
             try:
-                await update.message.reply_text("Ошибка загрузки меню. Попробуйте позже.")
+                await reply_with_footer(update, "Ошибка загрузки меню. Попробуйте позже.")
             except Exception as reply_error:
                 logger.error(f"Ошибка отправки сообщения об ошибке меню: {reply_error}")
     
@@ -210,21 +199,22 @@ class ConnectBotSimple:
             session_data = await self.get_user_session(user_id)
             
             if not session_data:
-                await update.message.reply_text("Сессия истекла. Введите /start для повторной авторизации.")
+                await reply_with_footer(update, "Сессия истекла. Введите /start для повторной авторизации.")
                 return
-            
             # Получаем настройки через PreferenceManager
             preference_manager = PreferenceManager()
             preferences_data = await sync_to_async(preference_manager.get_user_preferences_menu)(
                 session_data.get('employee_id')
             )
-            
-            await update.message.reply_text(**preferences_data)
+            if isinstance(preferences_data, dict) and preferences_data.get('reply_markup'):
+                await update.message.reply_text(**preferences_data)
+            else:
+                await reply_with_footer(update, preferences_data.get('text') if isinstance(preferences_data, dict) else preferences_data)
             
         except Exception as e:
             logger.error(f"Ошибка в команде /preferences: {e}", exc_info=True)
             try:
-                await update.message.reply_text("Ошибка загрузки настроек. Попробуйте позже.")
+                await reply_with_footer(update, "Ошибка загрузки настроек. Попробуйте позже.")
             except Exception as reply_error:
                 logger.error(f"Ошибка отправки сообщения об ошибке настроек: {reply_error}")
     
@@ -303,10 +293,7 @@ class ConnectBotSimple:
         logger.info(f"Сообщение от {user.username}: {message_text}")
         
         try:
-            await update.message.reply_text(
-                f"Получено сообщение: {message_text}\\n"
-                "Используйте /menu для доступа к функциям бота."
-            )
+            await reply_with_footer(update, f"Получено сообщение: {message_text}\nИспользуйте /menu для доступа к функциям бота.")
         except Exception as e:
             logger.error(f"Ошибка обработки сообщения: {e}")
     
@@ -322,9 +309,7 @@ class ConnectBotSimple:
         
         if update and hasattr(update, 'effective_message') and update.effective_message:
             try:
-                await update.effective_message.reply_text(
-                    "Произошла техническая ошибка. Команда разработки уведомлена."
-                )
+                await reply_with_footer(update.effective_message, "Произошла техническая ошибка. Команда разработки уведомлена.")
             except Exception as e:
                 logger.error(f"Ошибка отправки сообщения об ошибке: {e}")
     

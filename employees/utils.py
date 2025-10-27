@@ -5,6 +5,8 @@ import logging
 from asgiref.sync import sync_to_async
 from django.conf import settings
 from .models import Employee, EmployeeInterest, Interest
+from .redis_utils import RedisManager
+from django.db import transaction
 
 logger = logging.getLogger(__name__)
 
@@ -115,41 +117,53 @@ class PreferenceManager:
         Обновление интересов сотрудника
         """
         try:
-            # Получаем все активные интересы
-            all_interests = Interest.objects.filter(is_active=True)
-            interest_dict = {interest.code: interest for interest in all_interests}
-            
-            # Получаем текущие интересы сотрудника
-            current_interests = EmployeeInterest.objects.filter(employee=employee)
-            current_dict = {ei.interest.code: ei for ei in current_interests}
-            
-            # Обновляем интересы
-            for interest_code, interest in interest_dict.items():
-                if interest_code in interest_codes:
-                    # Активируем интерес
-                    if interest_code in current_dict:
-                        ei = current_dict[interest_code]
-                        if not ei.is_active:
-                            ei.is_active = True
-                            ei.save()
+            logger.info(f"INTERESTS_DEBUG: update_employee_interests called for employee_id={getattr(employee, 'id', None)} with codes={interest_codes}")
+            # Используем транзакцию, чтобы изменения применялись атомарно
+            with transaction.atomic():
+                # Получаем все активные интересы
+                all_interests = Interest.objects.filter(is_active=True)
+                interest_dict = {interest.code: interest for interest in all_interests}
+
+                # Получаем текущие интересы сотрудника
+                current_interests = EmployeeInterest.objects.filter(employee=employee)
+                current_dict = {ei.interest.code: ei for ei in current_interests}
+
+                # Обновляем интересы
+                for interest_code, interest in interest_dict.items():
+                    if interest_code in interest_codes:
+                        # Активируем интерес
+                        if interest_code in current_dict:
+                            ei = current_dict[interest_code]
+                            if not ei.is_active:
+                                ei.is_active = True
+                                ei.save(update_fields=['is_active'])
+                        else:
+                            EmployeeInterest.objects.create(
+                                employee=employee,
+                                interest=interest,
+                                is_active=True
+                            )
                     else:
-                        EmployeeInterest.objects.create(
-                            employee=employee,
-                            interest=interest,
-                            is_active=True
-                        )
-                else:
-                    # Деактивируем интерес
-                    if interest_code in current_dict:
-                        ei = current_dict[interest_code]
-                        if ei.is_active:
-                            ei.is_active = False
-                            ei.save()
-            
+                        # Деактивируем интерес
+                        if interest_code in current_dict:
+                            ei = current_dict[interest_code]
+                            if ei.is_active:
+                                ei.is_active = False
+                                ei.save(update_fields=['is_active'])
+
+            # Инвалидируем кеш сотрудника, чтобы последующие чтения брали свежие данные
+            try:
+                if getattr(employee, 'id', None):
+                    RedisManager.invalidate_employee_cache(employee.id)
+                    logger.info(f"INTERESTS_DEBUG: invalidated cache for employee_id={employee.id}")
+            except Exception:
+                logger.warning(f"INTERESTS_DEBUG: failed to invalidate cache for employee_id={getattr(employee, 'id', None)}")
+
+            logger.info(f"INTERESTS_DEBUG: update_employee_interests succeeded for employee_id={getattr(employee, 'id', None)}")
             return True
             
         except Exception as e:
-            logger.error(f"Ошибка обновления интересов: {e}")
+            logger.exception(f"Ошибка обновления интересов: {e}")
             return False
     
     @staticmethod
@@ -158,6 +172,13 @@ class PreferenceManager:
         """Отписаться от всех интересов"""
         try:
             EmployeeInterest.objects.filter(employee=employee).update(is_active=False)
+            # Очистим кеш, чтобы изменения сразу отразились
+            try:
+                if getattr(employee, 'id', None):
+                    RedisManager.invalidate_employee_cache(employee.id)
+                    logger.info(f"INTERESTS_DEBUG: invalidated cache for employee_id={employee.id}")
+            except Exception:
+                logger.warning(f"INTERESTS_DEBUG: failed to invalidate cache after disable_all for employee_id={getattr(employee, 'id', None)}")
             return True
         except Exception as e:
             logger.error(f"Ошибка отключения всех интересов: {e}")
