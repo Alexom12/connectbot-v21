@@ -3,6 +3,8 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ContextTypes, CallbackQueryHandler, CommandHandler, MessageHandler, filters
 from activities.services.anonymous_coffee_service import anonymous_coffee_service
 from employees.models import Employee
+from bots.utils.message_utils import reply_with_menu
+from bots.menu_manager import MenuManager
 
 logger = logging.getLogger(__name__)
 
@@ -16,7 +18,7 @@ async def start_coffee_scheduling(update: Update, context: ContextTypes.DEFAULT_
         if '_' in command:
             meeting_id = command.split('_')[-1]
         else:
-            await update.message.reply_text("❌ Неверная команда. Используйте команду из уведомления.")
+            await reply_with_menu(update, "❌ Неверная команда. Используйте команду из уведомления.", menu_type='main')
             return
         
         # Получаем сотрудника
@@ -26,7 +28,7 @@ async def start_coffee_scheduling(update: Update, context: ContextTypes.DEFAULT_
         success, result = await anonymous_coffee_service.handle_meeting_scheduling(meeting_id, employee)
         
         if not success:
-            await update.message.reply_text(result)
+            await reply_with_menu(update, result, menu_type='main')
             return
         
         # Сохраняем данные в контексте
@@ -38,40 +40,33 @@ async def start_coffee_scheduling(update: Update, context: ContextTypes.DEFAULT_
             'recognition_sign': result['recognition_sign']
         }
         
-        # Показываем меню планирования
-        keyboard = [
-            [InlineKeyboardButton("💬 Написать сообщение", callback_data="coffee_send_message")],
-            [InlineKeyboardButton("📅 Предложить встречу", callback_data="coffee_propose_meeting")],
-            [InlineKeyboardButton("❌ Экстренная остановка", callback_data="coffee_emergency_stop")],
-            [InlineKeyboardButton("📋 Инструкция", callback_data="coffee_instructions")],
-        ]
-        
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            f"""🎭 *ПЛАНИРОВАНИЕ ТАЙНОЙ ВСТРЕЧИ*
+        coffee_text = f"""
+🎭 *ПЛАНИРОВАНИЕ ТАЙНОЙ ВСТРЕЧИ*
 
 🤫 Общайтесь через бота-посредника
 📋 Ваш код: `{result['employee_code']}`
 🎯 Опознавательный знак: *{result['recognition_sign']}*
 
-Выберите действие:""",
-            reply_markup=reply_markup,
-            parse_mode='Markdown'
-        )
+Используйте кнопки ниже для управления встречей:
+• 💬 Написать сообщение - отправить сообщение партнеру
+• 📅 Предложить встречу - выбрать время для встречи
+• 📋 Инструкция - правила и рекомендации
+"""
+        
+        await reply_with_menu(update, coffee_text, menu_type='coffee', parse_mode='Markdown')
         
     except Employee.DoesNotExist:
-        await update.message.reply_text("❌ Сначала завершите регистрацию в системе.")
+        await reply_with_menu(update, "❌ Сначала завершите регистрацию в системе.", menu_type='main')
     except Exception as e:
         logger.error(f"❌ Ошибка начала планирования: {e}")
-        await update.message.reply_text("❌ Произошла ошибка. Попробуйте позже.")
+        await reply_with_menu(update, "❌ Произошла ошибка. Попробуйте позже.", menu_type='main')
 
 async def handle_coffee_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Обработка текстовых сообщений для пересылки"""
     user_id = update.effective_user.id
     
     if 'current_meeting' not in context.user_data:
-        await update.message.reply_text("❌ Сначала начните планирование встречи через меню.")
+        await reply_with_menu(update, "❌ Сначала начните планирование встречи через меню.", menu_type='coffee')
         return
     
     meeting_data = context.user_data['current_meeting']
@@ -84,12 +79,12 @@ async def handle_coffee_message(update: Update, context: ContextTypes.DEFAULT_TY
     )
     
     if success:
-        await update.message.reply_text("✅ Сообщение отправлено партнеру!")
+        await reply_with_menu(update, "✅ Сообщение отправлено партнеру!", menu_type='coffee')
     else:
-        await update.message.reply_text("❌ Ошибка отправки сообщения.")
+        await reply_with_menu(update, "❌ Ошибка отправки сообщения.", menu_type='coffee')
 
 async def handle_coffee_callback(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Обработка callback от кнопок"""
+    """Обработка callback от кнопок (для обратной совместимости)"""
     query = update.callback_query
     await query.answer()
     
@@ -97,12 +92,16 @@ async def handle_coffee_callback(update: Update, context: ContextTypes.DEFAULT_T
     data = query.data
     
     if data == 'coffee_send_message':
-        await query.edit_message_text(
-            "💬 *ОТПРАВКА СООБЩЕНИЯ*\n\n"
-            "Напишите сообщение, и бот перешлет его вашему партнеру анонимно.\n\n"
-            "Партнер увидит только текст без вашего имени.",
-            parse_mode='Markdown'
-        )
+        message_text = """
+💬 *ОТПРАВКА СООБЩЕНИЯ*
+
+Напишите сообщение, и бот перешлет его вашему партнеру анонимно.
+
+Партнер увидит только текст без вашего имени.
+
+Просто напишите сообщение в чат и нажмите отправить.
+"""
+        await reply_with_menu(update, message_text, menu_type='coffee', parse_mode='Markdown')
         
     elif data == 'coffee_propose_meeting':
         await show_meeting_proposal_menu(query, context)
@@ -114,7 +113,7 @@ async def handle_coffee_callback(update: Update, context: ContextTypes.DEFAULT_T
         await show_coffee_instructions(query, context)
 
 async def show_meeting_proposal_menu(query, context):
-    """Показать меню предложения встречи"""
+    """Показать меню предложения встречи (для обратной совместимости)"""
     meeting_data = context.user_data['current_meeting']
     
     keyboard = [
@@ -137,7 +136,7 @@ async def show_meeting_proposal_menu(query, context):
     )
 
 async def handle_emergency_stop_request(query, context):
-    """Обработка запроса экстренной остановки"""
+    """Обработка запроса экстренной остановки (для обратной совместимости)"""
     keyboard = [
         [InlineKeyboardButton("✅ Да, остановить", callback_data="emergency_confirm")],
         [InlineKeyboardButton("❌ Нет, отмена", callback_data="coffee_back")],
@@ -158,7 +157,7 @@ async def handle_emergency_stop_request(query, context):
     )
 
 async def show_coffee_instructions(query, context):
-    """Показать инструкцию по Тайному кофе"""
+    """Показать инструкцию по Тайному кофе (для обратной совместимости)"""
     meeting_data = context.user_data['current_meeting']
     
     instructions = f"""🎭 *ИНСТРУКЦИЯ ТАЙНОГО КОФЕ*
@@ -195,10 +194,103 @@ async def show_coffee_instructions(query, context):
     
     await query.edit_message_text(instructions, reply_markup=reply_markup, parse_mode='Markdown')
 
+async def handle_coffee_text_commands(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик текстовых команд для Тайного кофе через Reply клавиатуру"""
+    text = update.message.text
+    user_id = update.effective_user.id
+    
+    try:
+        if text == "💬 Написать сообщение":
+            message_help = """
+💬 *Написать сообщение партнеру*
+
+Просто напишите ваше сообщение в чат и нажмите отправить.
+
+Бот автоматически перешлет его вашему партнеру анонимно.
+
+💡 Сообщение будет доставлено без указания вашего имени.
+"""
+            await reply_with_menu(update, message_help, menu_type='coffee', parse_mode='Markdown')
+            
+        elif text == "📅 Предложить встречу":
+            meeting_help = """
+📅 *Предложить встречу*
+
+Для предложения встречи используйте следующие форматы:
+
+*Онлайн встречи:*
+• "Понедельник 10:00-12:00 онлайн"
+• "Среда 14:00-15:00 видеозвонок"
+
+*Оффлайн встречи:*
+• "Вторник 12:00-13:00 кафе на 1 этаже"
+• "Четверг 16:00-17:00 переговорка 3.14"
+
+💡 Вы можете предложить до 3 вариантов времени.
+"""
+            await reply_with_menu(update, meeting_help, menu_type='coffee', parse_mode='Markdown')
+            
+        elif text == "📋 Инструкция":
+            instructions = """
+📋 *Инструкция Тайного кофе*
+
+🤫 *СОХРАНЯЙТЕ ТАЙНУ*
+• Не раскрывайте свою личность
+• Используйте только коды для общения
+
+💬 *ОБЩЕНИЕ ЧЕРЕЗ БОТА*
+• Все сообщения идут через посредника
+• Бот сохраняет анонимность
+
+🎯 *ПЛАНИРОВАНИЕ ВСТРЕЧИ*
+1. Предложите время через бота
+2. Партнер подтвердит или предложит другое
+3. После подтверждения получите финальные инструкции
+
+🚨 *БЕЗОПАСНОСТЬ*
+• Используйте только официальные команды
+• Все инциденты анонимно разбираются
+• Модератор доступен 24/7
+"""
+            await reply_with_menu(update, instructions, menu_type='coffee', parse_mode='Markdown')
+            
+        elif text == "⬅️ Назад в меню":
+            menu_text = await MenuManager.create_main_menu_message()
+            await reply_with_menu(update, menu_text, menu_type='main', parse_mode='Markdown')
+            
+        else:
+            # Если это обычное сообщение и есть активная встреча, пересылаем его
+            if 'current_meeting' in context.user_data:
+                await handle_coffee_message(update, context)
+            else:
+                # Если нет активной встречи, показываем меню кофе
+                coffee_text = await MenuManager.create_coffee_menu()
+                await reply_with_menu(update, coffee_text, menu_type='coffee', parse_mode='Markdown')
+                
+    except Exception as e:
+        logger.error(f"Ошибка обработки текстовой команды кофе: {e}")
+        await reply_with_menu(update, "❌ Произошла ошибка. Попробуйте позже.", menu_type='main')
+
 def setup_secret_coffee_handlers(application):
     """Настройка обработчиков Тайного кофе"""
+    # Оставляем команду для обратной совместимости
     application.add_handler(CommandHandler("schedule_meeting", start_coffee_scheduling))
+    
+    # Обработчики callback для обратной совместимости
     application.add_handler(CallbackQueryHandler(handle_coffee_callback, pattern="^coffee_"))
     application.add_handler(CallbackQueryHandler(handle_coffee_callback, pattern="^prop_"))
     application.add_handler(CallbackQueryHandler(handle_coffee_callback, pattern="^emergency_"))
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_coffee_message))
+    
+    # Обработчик текстовых сообщений для Тайного кофе через Reply клавиатуру
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND & filters.Regex(
+            r'^(💬 Написать сообщение|📅 Предложить встречу|📋 Инструкция|⬅️ Назад в меню)$'
+        ),
+        handle_coffee_text_commands
+    ))
+    
+    # Обработчик обычных текстовых сообщений (для пересылки)
+    application.add_handler(MessageHandler(
+        filters.TEXT & ~filters.COMMAND,
+        handle_coffee_text_commands
+    ))

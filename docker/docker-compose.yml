@@ -1,78 +1,84 @@
 services:
   redis:
     image: redis:7-alpine
+    container_name: connectbot-v21-redis
+    restart: always
     ports:
       - "6379:6379"
-    volumes:
-      - ./redis/redis.conf:/usr/local/etc/redis/redis.conf:ro
-    command: [ "redis-server", "/usr/local/etc/redis/redis.conf" ]
 
   matching-service:
-    build:
-      context: ../connectbot-java-services/matching-service
+    image: alexone1123/connectbot-matching-service:latest
+    container_name: connectbot-v21-matching-service
+    restart: always
     ports:
       - "8081:8081"
-    env_file:
-      - ../.env
+    volumes:
+      - ../service_auth_token.txt:/run/secrets/service_auth_token:ro
     environment:
       SPRING_DATASOURCE_URL: "jdbc:h2:mem:testdb"
-      # These values will be read from ../.env (if present)
-      SERVICE_AUTH_TOKEN: "${SERVICE_AUTH_TOKEN}"
-      DATAAPI_BASE_URL: "${DATAAPI_BASE_URL:-http://web:8000}"
-      DATAAPI_SERVICE_TOKEN: "${SERVICE_AUTH_TOKEN}"
+      SERVICE_AUTH_TOKEN_FILE: "/run/secrets/service_auth_token"
+      DATAAPI_BASE_URL: "http://web:8000"
+      DATAAPI_SERVICE_TOKEN_FILE: "/run/secrets/service_auth_token"
 
   web:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
-    command: bash -c "python manage.py migrate --noinput && python manage.py runserver 0.0.0.0:8000"
-    volumes:
-      - ../:/app:delegated
+    image: alexone1123/connectbot-web:latest
+    container_name: connectbot-v21-web
+    restart: always
+    command: bash -c "python manage.py collectstatic --noinput && gunicorn --chdir /app config.wsgi:application --bind 0.0.0.0:8000"
     ports:
       - "8000:8000"
-    env_file:
-      - ../.env
+    volumes:
+      - sqlite_data:/app/data
+      - ../service_auth_token.txt:/run/secrets/service_auth_token:ro
+      - ../telegram_bot_token_dev.txt:/run/secrets/telegram_bot_token_dev:ro
+      - ../django_secret_key.txt:/run/secrets/django_secret_key:ro
     environment:
-      DEBUG: "1"
+      DEBUG: "0"
+      DATABASE_URL: "sqlite:////app/data/db.sqlite3"
       MATCHING_SERVICE_URL: "http://matching-service:8081"
       REDIS_URL: "redis://redis:6379/0"
-      SERVICE_AUTH_TOKEN: "${SERVICE_AUTH_TOKEN}"
-      METRICS_TRIGGER_TOKEN: "${METRICS_TRIGGER_TOKEN}"
-      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
+      DJANGO_SECRET_KEY_FILE: "/run/secrets/django_secret_key"
+      SERVICE_AUTH_TOKEN_FILE: "/run/secrets/service_auth_token"
+      TELEGRAM_BOT_TOKEN_FILE: "/run/secrets/telegram_bot_token_dev"
     depends_on:
-      - matching-service
       - redis
+      - matching-service
 
   bot:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: alexone1123/connectbot-bot:latest
+    container_name: connectbot-v21-bot
+    restart: always
     command: python manage.py runbot
     volumes:
-      - ../:/app:delegated
-    env_file:
-      - ../.env
+      - sqlite_data:/app/data
+      - ../service_auth_token.txt:/run/secrets/service_auth_token:ro
+      - ../telegram_bot_token_dev.txt:/run/secrets/telegram_bot_token_dev:ro
+      - ../django_secret_key.txt:/run/secrets/django_secret_key:ro
     environment:
-      DEBUG: "1"
+      DEBUG: "0"
+      DATABASE_URL: "sqlite:////app/data/db.sqlite3"
       MATCHING_SERVICE_URL: "http://matching-service:8081"
       REDIS_URL: "redis://redis:6379/0"
-      SERVICE_AUTH_TOKEN: "${SERVICE_AUTH_TOKEN}"
-      METRICS_TRIGGER_TOKEN: "${METRICS_TRIGGER_TOKEN}"
-      TELEGRAM_BOT_TOKEN: "${TELEGRAM_BOT_TOKEN}"
+      DJANGO_SECRET_KEY_FILE: "/run/secrets/django_secret_key"
+      SERVICE_AUTH_TOKEN_FILE: "/run/secrets/service_auth_token"
+      TELEGRAM_BOT_TOKEN_FILE: "/run/secrets/telegram_bot_token_dev"
     depends_on:
-      - web
-      - matching-service
       - redis
+      - web
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
 
   prometheus:
     image: prom/prometheus:latest
-    volumes:
-      - ./docker/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    container_name: connectbot-v21-prometheus
+    restart: always
     ports:
       - "9090:9090"
-    depends_on:
-      - web
-      - matching-service
+
+volumes:
+  sqlite_data:
+
 
 networks:
   default:

@@ -59,10 +59,9 @@ def _auth_ok(request):
     if scheme.lower() != 'service':
         return False
 
-    # Prefer Django settings.SERVICE_AUTH_TOKEN if set (useful in tests/CI)
-    expected = getattr(settings, 'SERVICE_AUTH_TOKEN', None) or os.getenv('SERVICE_AUTH_TOKEN', '')
-    if not expected:
-        expected = _read_service_token_from_file()
+    # Prefer explicit environment variable (tests/CI may patch os.environ).
+    # Fallback to Django settings.SERVICE_AUTH_TOKEN, then token file.
+    expected = os.getenv('SERVICE_AUTH_TOKEN', '') or getattr(settings, 'SERVICE_AUTH_TOKEN', None) or _read_service_token_from_file()
 
     if not expected:
         # no configured token -> fail closed

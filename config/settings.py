@@ -11,14 +11,29 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 SECRET_KEY = config('SECRET_KEY', default='django-insecure-change-in-production')
 DEBUG = config('DEBUG', default=True, cast=bool)
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['195.133.50.206', '127.0.0.1', 'localhost']
 
 # Telegram Bot Token
+TELEGRAM_TOKEN = None
+# Priority: file from TELEGRAM_BOT_TOKEN_FILE env (e.g. /run/secrets/telegram_bot_token_dev),
+# then telegram_token.txt in repo root (for legacy local setups), then TELEGRAM_BOT_TOKEN env var.
 try:
-    with open('telegram_token.txt', 'r') as f:
-        TELEGRAM_TOKEN = f.read().strip()
-except FileNotFoundError:
+    token_file_env = os.getenv('TELEGRAM_BOT_TOKEN_FILE')
+    if token_file_env and os.path.exists(token_file_env):
+        with open(token_file_env, 'r', encoding='utf-8') as f:
+            TELEGRAM_TOKEN = f.read().strip()
+    else:
+        try:
+            with open('telegram_token.txt', 'r', encoding='utf-8') as f:
+                TELEGRAM_TOKEN = f.read().strip()
+        except Exception:
+            TELEGRAM_TOKEN = None
+except Exception:
     TELEGRAM_TOKEN = None
+
+# fallback to TELEGRAM_BOT_TOKEN env var (decouple)
+if not TELEGRAM_TOKEN:
+    TELEGRAM_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
 
 
 # Application definition
@@ -42,6 +57,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -142,7 +158,7 @@ MEDIA_ROOT = BASE_DIR / 'media'
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # Telegram Bot Settings
-TELEGRAM_BOT_TOKEN = config('TELEGRAM_BOT_TOKEN', default='')
+TELEGRAM_BOT_TOKEN = TELEGRAM_TOKEN or config('TELEGRAM_BOT_TOKEN', default='')
 SUPER_ADMIN_ID = config('SUPER_ADMIN_ID', default=0, cast=int)
 
 # Service-to-service auth token for Data API
@@ -244,11 +260,12 @@ LOGGING = {
 
 # Security settings
 if not DEBUG:
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
+    SECURE_SSL_REDIRECT = False # True
+    SESSION_COOKIE_SECURE = False # True
+    CSRF_COOKIE_SECURE = False # True
     SECURE_BROWSER_XSS_FILTER = True
     SECURE_CONTENT_TYPE_NOSNIFF = True
+    CSRF_TRUSTED_ORIGINS = ['http://195.133.50.206:8000']
 
 # Email settings (for future notifications)
 EMAIL_BACKEND = config('EMAIL_BACKEND', default='django.core.mail.backends.console.EmailBackend')

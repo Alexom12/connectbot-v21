@@ -24,6 +24,7 @@ from asgiref.sync import sync_to_async
 from employees.utils import AuthManager, PreferenceManager
 from employees.redis_utils import RedisManager
 from bots.menu_manager import MenuManager
+from bots.utils.message_utils import reply_with_footer
 
 # Настройка логирования
 logging.basicConfig(
@@ -98,13 +99,10 @@ class ConnectBotMinimal:
             # Проверяем авторизацию пользователя
             auth_manager = AuthManager()
             is_authorized = await sync_to_async(auth_manager.is_user_authorized)(user_id, username)
-            
+
             if not is_authorized:
                 logger.warning(f"Неавторизован: {username}")
-                await update.message.reply_text(
-                    f"Извините, {username}, у вас нет доступа к этому боту.\\n"
-                    "Обратитесь к администратору."
-                )
+                await reply_with_footer(update, f"Извините, {username}, у вас нет доступа к этому боту.\nОбратитесь к администратору.")
                 return
             
             # Очищаем и обновляем сессию
@@ -128,12 +126,10 @@ class ConnectBotMinimal:
                     "Команды: /menu /preferences"
                 )
                 
-                await update.message.reply_text(response)
+                await reply_with_footer(update, response)
             else:
                 logger.error(f"Нет данных пользователя: {username}")
-                await update.message.reply_text(
-                    "Ошибка авторизации. Попробуйте позже."
-                )
+                await reply_with_footer(update, "Ошибка авторизации. Попробуйте позже.")
                 
         except Exception as e:
             logger.error(f"Ошибка /start: {e}")
@@ -149,7 +145,7 @@ class ConnectBotMinimal:
             session_data = await self.get_user_session(user_id)
             
             if not session_data:
-                await update.message.reply_text("Сессия истекла. Используйте /start")
+                await reply_with_footer(update, "Сессия истекла. Используйте /start")
                 return
             
             menu_manager = MenuManager()
@@ -158,7 +154,12 @@ class ConnectBotMinimal:
                 session_data.get('role')
             )
             
-            await update.message.reply_text(**menu_data)
+            # menu_data may include reply_markup already; if not, use footer helper
+            if isinstance(menu_data, dict) and menu_data.get('reply_markup'):
+                await update.message.reply_text(**menu_data)
+            else:
+                # Prefer reply_with_footer for consistent bottom keyboard
+                await reply_with_footer(update, menu_data.get('text') if isinstance(menu_data, dict) else menu_data)
             
         except Exception as e:
             logger.error(f"Ошибка меню: {e}")
@@ -174,7 +175,7 @@ class ConnectBotMinimal:
             session_data = await self.get_user_session(user_id)
             
             if not session_data:
-                await update.message.reply_text("Сессия истекла. Используйте /start")
+                await reply_with_footer(update, "Сессия истекла. Используйте /start")
                 return
             
             preference_manager = PreferenceManager()
@@ -182,7 +183,10 @@ class ConnectBotMinimal:
                 session_data.get('employee_id')
             )
             
-            await update.message.reply_text(**preferences_data)
+            if isinstance(preferences_data, dict) and preferences_data.get('reply_markup'):
+                await update.message.reply_text(**preferences_data)
+            else:
+                await reply_with_footer(update, preferences_data.get('text') if isinstance(preferences_data, dict) else preferences_data)
             
         except Exception as e:
             logger.error(f"Ошибка настроек: {e}")
@@ -257,7 +261,12 @@ class ConnectBotMinimal:
     async def safe_reply(self, message, text):
         """Безопасная отправка ответа с обработкой ошибок"""
         try:
-            await message.reply_text(text)
+            # Prefer reply_with_footer when possible to attach persistent footer
+            try:
+                fake_update = type('U', (), {'message': message, 'effective_message': message})()
+                await reply_with_footer(fake_update, text)
+            except Exception:
+                await message.reply_text(text)
         except Exception as e:
             logger.error(f"Ошибка отправки сообщения: {e}")
     
@@ -276,11 +285,12 @@ class ConnectBotMinimal:
         # Не пытаемся отправлять сообщения при сетевых проблемах
         if update and hasattr(update, 'effective_message') and update.effective_message:
             try:
-                await update.effective_message.reply_text(
-                    "Произошла ошибка. Попробуйте позже."
-                )
+                await reply_with_footer(update, "Произошла ошибка. Попробуйте позже.")
             except:
-                pass  # Игнорируем ошибки отправки сообщений об ошибках
+                try:
+                    await reply_with_footer(update, "Произошла ошибка. Попробуйте позже.")
+                except:
+                    pass  # Игнорируем ошибки отправки сообщений об ошибках
     
     def setup_handlers(self):
         """Настройка обработчиков"""

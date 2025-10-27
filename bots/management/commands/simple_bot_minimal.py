@@ -6,6 +6,7 @@ import logging
 import sys
 from django.core.management.base import BaseCommand
 from django.conf import settings
+from bots.utils.message_utils import reply_with_footer
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +49,7 @@ class Command(BaseCommand):
 ⚙️ Настройки - управляй уведомлениями
 
 Используй /help для полного списка команд."""
-                    await update.message.reply_text(message)
+                    await reply_with_footer(update, message)
                     self.stdout.write("✅ Ответ отправлен")
                 except Exception as e:
                     self.stdout.write(f"❌ Ошибка ответа: {e}")
@@ -79,7 +80,7 @@ class Command(BaseCommand):
 /test - Проверка работы
 
 🚀 Бот работает стабильно!"""
-                    await update.message.reply_text(message, parse_mode='Markdown')
+                    await reply_with_footer(update, message, parse_mode='Markdown')
                     self.stdout.write("✅ Ответ отправлен")
                 except Exception as e:
                     self.stdout.write(f"❌ Ошибка ответа: {e}")
@@ -94,7 +95,7 @@ class Command(BaseCommand):
 🎯 Матчинг каждую неделю по понедельникам
 
 💡 Для участия обновите свой профиль!"""
-                    await update.message.reply_text(message, parse_mode='Markdown')
+                    await reply_with_footer(update, message, parse_mode='Markdown')
                     self.stdout.write("✅ Ответ отправлен")
                 except Exception as e:
                     self.stdout.write(f"❌ Ошибка ответа: {e}")
@@ -112,7 +113,7 @@ class Command(BaseCommand):
 
 📊 /stats - Моя статистика
 ⚙️ /settings - Настройки уведомлений"""
-                    await update.message.reply_text(message, parse_mode='Markdown')
+                    await reply_with_footer(update, message, parse_mode='Markdown')
                     self.stdout.write("✅ Ответ отправлен")
                 except Exception as e:
                     self.stdout.write(f"❌ Ошибка ответа: {e}")
@@ -130,7 +131,7 @@ class Command(BaseCommand):
 📊 /stats - Статистика активности
 ⚙️ /settings - Настройки профиля
 ☕ /preferences - Настройки Тайного кофе"""
-                    await update.message.reply_text(message, parse_mode='Markdown')
+                    await reply_with_footer(update, message, parse_mode='Markdown')
                     self.stdout.write("✅ Ответ отправлен")
                 except Exception as e:
                     self.stdout.write(f"❌ Ошибка ответа: {e}")
@@ -148,7 +149,7 @@ class Command(BaseCommand):
 🔕 /notifications - Управление уведомлениями
 
 💡 Скоро будет доступно больше настроек!"""
-                    await update.message.reply_text(message, parse_mode='Markdown')
+                    await reply_with_footer(update, message, parse_mode='Markdown')
                     self.stdout.write("✅ Ответ отправлен")
                 except Exception as e:
                     self.stdout.write(f"❌ Ошибка ответа: {e}")
@@ -171,7 +172,7 @@ class Command(BaseCommand):
    └ Активность: начинающий
 
 💡 Участвуйте в активностях для роста статистики!"""
-                    await update.message.reply_text(message, parse_mode='Markdown')
+                    await reply_with_footer(update, message, parse_mode='Markdown')
                     self.stdout.write("✅ Ответ отправлен")
                 except Exception as e:
                     self.stdout.write(f"❌ Ошибка ответа: {e}")
@@ -191,7 +192,7 @@ class Command(BaseCommand):
 • Отметьте интересные темы
 
 💡 Настройки помогут найти подходящего собеседника!"""
-                    await update.message.reply_text(message, parse_mode='Markdown')
+                    await reply_with_footer(update, message, parse_mode='Markdown')
                     self.stdout.write("✅ Ответ отправлен")
                 except Exception as e:
                     self.stdout.write(f"❌ Ошибка ответа: {e}")
@@ -199,7 +200,7 @@ class Command(BaseCommand):
             async def test_cmd(update, context):
                 self.stdout.write(f"Команда /test от {update.effective_user.first_name}")
                 try:
-                    await update.message.reply_text("✅ Тест прошел! Все команды работают корректно.")
+                    await reply_with_footer(update, "✅ Тест прошел! Все команды работают корректно.")
                     self.stdout.write("✅ Ответ отправлен")
                 except Exception as e:
                     self.stdout.write(f"❌ Ошибка ответа: {e}")

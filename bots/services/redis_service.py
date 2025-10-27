@@ -3,6 +3,7 @@
 """
 import logging
 import redis
+import urllib.parse
 from django.conf import settings
 
 logger = logging.getLogger(__name__)
@@ -17,14 +18,34 @@ class RedisService:
     def _connect(self):
         """Подключение к Redis"""
         try:
-            # Используем настройки из Django settings
-            redis_settings = getattr(settings, 'REDIS_SETTINGS', {})
-            
+            # Пытаемся распарсить REDIS_URL из настройки, если она есть
+            redis_url = getattr(settings, 'REDIS_URL', None) or ''
+            host = 'localhost'
+            port = 6379
+            db = 0
+            if redis_url:
+                try:
+                    parsed = urllib.parse.urlparse(redis_url)
+                    host = parsed.hostname or host
+                    port = parsed.port or port
+                    # путь вида /0
+                    if parsed.path:
+                        try:
+                            db = int(parsed.path.lstrip('/'))
+                        except Exception:
+                            db = 0
+                except Exception:
+                    # fallback to defaults
+                    host = 'localhost'
+                    port = 6379
+
             self.redis_client = redis.Redis(
-                host=redis_settings.get('HOST', 'localhost'),
-                port=redis_settings.get('PORT', 6379),
-                db=redis_settings.get('DB', 0),
-                decode_responses=True
+                host=host,
+                port=port,
+                db=db,
+                decode_responses=True,
+                socket_connect_timeout=5,
+                socket_timeout=5,
             )
             
             # Проверяем подключение

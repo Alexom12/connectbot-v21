@@ -312,21 +312,29 @@ class ConnectBot:
             employee = await self.find_employee_by_user(user)
             
             if employee:
-                await update.message.reply_text(
-                    f"Добро пожаловать, {employee.full_name}! 🎉\\n"
-                    "Вы успешно авторизованы в ConnectBot."
-                )
+                    # In interactive contexts this should use the persistent footer
+                    try:
+                        await reply_with_footer(update, "Добро пожаловать, {employee.full_name}! 🎉\\n"
+                        "Вы успешно авторизованы в ConnectBot.")
+                    except Exception:
+                        pass
                 # Здесь будет переход к настройке предпочтений
             else:
-                await update.message.reply_text(
-                    "🔐 *Доступ к ConnectBot ограничен*\\n\\n"
-                    "Для использования бота необходимо быть сотрудником компании.\\n"
-                    "Если вы сотрудник, но не можете войти, обратитесь к администратору."
-                )
+                    try:
+                        await reply_with_footer(update, "🔐 *Доступ к ConnectBot ограничен*\\n\\n"
+                        "Для использования бота необходимо быть сотрудником компании.\\n"
+                        "Если вы сотрудник, но не можете войти, обратитесь к администратору.")
+                    except Exception:
+                        pass
                 
         except Exception as e:
             logger.error(f"Ошибка в команде /start: {e}")
-            await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
+            try:
+                from bots.utils.message_utils import reply_with_footer
+                await reply_with_footer(update, "Произошла ошибка. Попробуйте позже.")
+            except Exception:
+                # fallback to plain reply if footer helper not available
+                await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
     
     @sync_to_async
     def find_employee_by_user(self, user):

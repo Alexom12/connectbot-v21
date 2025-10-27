@@ -14,6 +14,7 @@ from asgiref.sync import sync_to_async
 from employees.utils import AuthManager, PreferenceManager
 from employees.redis_utils import RedisManager
 from bots.menu_manager import MenuManager
+from bots.utils.message_utils import reply_with_footer
 
 logger = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ class ConnectBot:
                 
                 # Отправляем приветственное сообщение
                 welcome_message = await AuthManager.get_welcome_message(employee)
-                await update.message.reply_text(welcome_message, parse_mode='Markdown')
+                await reply_with_footer(update, welcome_message, parse_mode='Markdown')
                 
                 # Если новая авторизация, предлагаем настроить предпочтения
                 if is_new:
@@ -117,13 +118,11 @@ class ConnectBot:
                 await self.clear_user_session(user.id)
                 error_message = await AuthManager.get_unauthorized_message()
                 formatted_message = error_message.format(username=user.username or 'ваш_username')
-                await update.message.reply_text(formatted_message, parse_mode='Markdown')
+                await reply_with_footer(update, formatted_message, parse_mode='Markdown')
                 
         except Exception as e:
             logger.error(f"Ошибка в команде /start: {e}")
-            await update.message.reply_text(
-                "Произошла ошибка при авторизации. Попробуйте позже или обратитесь к администратору."
-            )
+            await reply_with_footer(update, "Произошла ошибка при авторизации. Попробуйте позже или обратитесь к администратору.")
     
     async def show_preferences_setup(self, update: Update, context: ContextTypes.DEFAULT_TYPE, employee):
         """Настройка предпочтений при первой авторизации"""
@@ -197,14 +196,14 @@ class ConnectBot:
             if not employee:
                 error_message = await AuthManager.get_unauthorized_message()
                 formatted_message = error_message.format(username=user.username or 'ваш_username')
-                await update.message.reply_text(formatted_message, parse_mode='Markdown')
+                await reply_with_footer(update, formatted_message, parse_mode='Markdown')
                 return
             
             await self.show_interests_menu(update, context, employee)
             
         except Exception as e:
             logger.error(f"Ошибка в команде /preferences: {e}")
-            await update.message.reply_text("Произошла ошибка. Попробуйте позже.")
+            await reply_with_footer(update, "Произошла ошибка. Попробуйте позже.")
     
     async def menu(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Обработчик команды /menu"""
@@ -502,11 +501,11 @@ class ConnectBot:
             "📋 *Доступные команды:*\n"
             "/start - Авторизация и главное меню\n"
             "/menu - Главное меню\n"
-            "/preferences - Настройка интересов\n"
+            "/preferences - Настройка интересов\n" 
             "/help - Эта справка\n\n"
             "💡 *Совет:* Используйте кнопки меню для удобной навигации!"
         )
-        await update.message.reply_text(help_text, parse_mode='Markdown')
+        await reply_with_footer(update, help_text, parse_mode='Markdown')
     
     def setup_handlers(self):
         """Настройка обработчиков команд"""
@@ -534,11 +533,11 @@ class ConnectBot:
         if not employee:
             error_message = await AuthManager.get_unauthorized_message()
             formatted_message = error_message.format(username=user.username or 'ваш_username')
-            await update.message.reply_text(formatted_message, parse_mode='Markdown')
+            await reply_with_footer(update, formatted_message, parse_mode='Markdown')
             return
         
         # Если пользователь авторизован, предлагаем меню
-        await update.message.reply_text(
+        await reply_with_footer(update,
             "🤖 Используйте команды или меню для навигации:\n"
             "/menu - Главное меню\n"
             "/preferences - Настройки интересов\n" 
@@ -559,9 +558,7 @@ class ConnectBot:
         
         if update and update.effective_message and self.running:
             try:
-                await update.effective_message.reply_text(
-                    "Произошла техническая ошибка. Администратор уведомлен."
-                )
+                await reply_with_footer(update, "Произошла техническая ошибка. Администратор уведомлен.")
             except:
                 pass  # Игнорируем ошибки при отправке сообщения об ошибке
     

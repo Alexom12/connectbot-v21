@@ -14,6 +14,8 @@ from telegram.ext import (
 from activities.feedback_services import FeedbackService
 from bots.services.user_service import format_user_for_logging
 from bots.handlers.error_handlers import handle_text_instead_of_button, handle_unexpected_state
+from bots.utils.message_utils import reply_with_menu
+from bots.menu_manager import MenuManager
 
 # Инициализация сервиса
 feedback_service = FeedbackService()
@@ -32,7 +34,7 @@ async def start_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
     pending_meetings = await feedback_service.get_pending_feedbacks_for_user(user.id)
 
     if not pending_meetings:
-        await context.bot.send_message(chat_id=user.id, text="У вас нет встреч, ожидающих отзыва. Спасибо!")
+        await reply_with_menu(update, "У вас нет встреч, ожидающих отзыва. Спасибо!", menu_type='main')
         return ConversationHandler.END
 
     keyboard = [
@@ -45,9 +47,9 @@ async def start_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         for meeting in pending_meetings
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await context.bot.send_message(
-        chat_id=user.id,
-        text="Пожалуйста, выберите встречу, для которой хотите оставить отзыв:",
+    
+    await update.message.reply_text(
+        "Пожалуйста, выберите встречу, для которой хотите оставить отзыв:",
         reply_markup=reply_markup
     )
     return ASK_RATING
@@ -94,11 +96,11 @@ async def ask_suggestions(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     
     meeting_key = next((key for key in context.user_data if key.startswith('meeting_id_')), None)
     if not meeting_key:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Произошла ошибка. Попробуйте снова.")
+        await reply_with_menu(update, "Произошла ошибка. Попробуйте снова.", menu_type='main')
         return ConversationHandler.END
 
     context.user_data[meeting_key]['comment'] = comment
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Спасибо! Теперь, если хотите, напишите предложения по улучшению. Если их нет, введите 'нет'.")
+    await update.message.reply_text("Спасибо! Теперь, если хотите, напишите предложения по улучшению. Если их нет, введите 'нет'.")
     return ASK_FINAL
 
 async def end_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -108,7 +110,7 @@ async def end_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
     meeting_key = next((key for key in context.user_data if key.startswith('meeting_id_')), None)
     if not meeting_key:
-        await context.bot.send_message(chat_id=update.effective_chat.id, text="Произошла ошибка. Попробуйте снова.")
+        await reply_with_menu(update, "Произошла ошибка. Попробуйте снова.", menu_type='main')
         return ConversationHandler.END
 
     feedback_data = context.user_data[meeting_key]
@@ -121,7 +123,7 @@ async def end_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
         suggestions=suggestions if suggestions.lower() not in ['нет', 'no'] else ''
     )
     
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="✅ Ваш отзыв принят! Спасибо за участие.")
+    await reply_with_menu(update, "✅ Ваш отзыв принят! Спасибо за участие.", menu_type='main')
     
     # Очистка
     if meeting_key in context.user_data:
@@ -131,12 +133,35 @@ async def end_feedback(update: Update, context: ContextTypes.DEFAULT_TYPE) -> in
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
     """Отменяет диалог."""
-    await context.bot.send_message(chat_id=update.effective_chat.id, text="Сбор отзыва отменен.")
+    await reply_with_menu(update, "Сбор отзыва отменен.", menu_type='main')
     context.user_data.clear()
     return ConversationHandler.END
 
+async def feedback_command(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Обработчик команды /feedback через Reply клавиатуру"""
+    user = update.effective_user
+    logger.info(f"Пользователь {format_user_for_logging(user)} запросил оставить отзыв.")
+
+    pending_meetings = await feedback_service.get_pending_feedbacks_for_user(user.id)
+
+    if not pending_meetings:
+        feedback_text = """
+📝 *Оставить отзыв*
+
+У вас нет встреч, ожидающих отзыва. 
+
+Спасибо за вашу активность! Отзывы помогают нам улучшать качество встреч.
+
+💡 После участия в следующей встрече вы сможете оставить отзыв.
+"""
+        await reply_with_menu(update, feedback_text, menu_type='main', parse_mode='Markdown')
+        return
+
+    # Если есть встречи для отзыва, запускаем стандартный процесс
+    await start_feedback(update, context)
+
 feedback_conv_handler = ConversationHandler(
-    entry_points=[CommandHandler("feedback", start_feedback)],
+    entry_points=[CommandHandler("feedback", start_feedback), CallbackQueryHandler(start_feedback, pattern=r"^feedback_\d+$")],
     states={
         ASK_RATING: [
             CallbackQueryHandler(ask_rating, pattern=r"^feedback_\d+$"),
@@ -154,3 +179,11 @@ feedback_conv_handler = ConversationHandler(
         MessageHandler(filters.ALL, handle_unexpected_state),
     ],
 )
+
+def setup_feedback_handlers(application):
+    """Настройка обработчиков обратной связи"""
+    # Добавляем conversation handler для обратной связи
+    application.add_handler(feedback_conv_handler)
+    
+    # Добавляем обработчик команды /feedback для Reply клавиатуры
+    application.add_handler(CommandHandler("feedback", feedback_command))
